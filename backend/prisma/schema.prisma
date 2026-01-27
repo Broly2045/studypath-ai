@@ -1,0 +1,213 @@
+// Prisma Schema for StudyPath AI Counselor
+// Database: PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============== USER & AUTH ==============
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  password      String?   // Null for Google OAuth users
+  fullName      String
+  googleId      String?   @unique
+  avatarUrl     String?
+  
+  // Onboarding status
+  onboardingCompleted Boolean @default(false)
+  currentStage        Int     @default(1) // 1-4 stages
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  profile       Profile?
+  conversations Conversation[]
+  shortlistedUniversities ShortlistedUniversity[]
+  tasks         Task[]
+}
+
+// ============== STUDENT PROFILE ==============
+
+model Profile {
+  id        String @id @default(uuid())
+  userId    String @unique
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // A. Academic Background
+  educationLevel    String?   // "high_school", "bachelors", "masters"
+  currentDegree     String?
+  major             String?
+  graduationYear    Int?
+  gpa               Float?
+  gpaScale          Float?    @default(10.0) // 4.0 or 10.0
+  
+  // B. Study Goal
+  intendedDegree    String?   // "bachelors", "masters", "mba", "phd"
+  fieldOfStudy      String?
+  targetIntakeYear  Int?
+  targetIntakeSeason String?  // "fall", "spring", "summer"
+  preferredCountries String[] // Array of country codes
+  
+  // C. Budget
+  budgetMin         Int?      // Per year in USD
+  budgetMax         Int?
+  fundingPlan       String?   // "self_funded", "scholarship", "loan", "mixed"
+  
+  // D. Exams & Readiness
+  ieltsStatus       String?   // "not_started", "preparing", "scheduled", "completed"
+  ieltsScore        Float?
+  toeflStatus       String?
+  toeflScore        Int?
+  greStatus         String?
+  greScore          Int?
+  gmatStatus        String?
+  gmatScore         Int?
+  sopStatus         String?   // "not_started", "draft", "ready"
+  
+  // Profile Strength (AI calculated)
+  academicStrength  String?   // "strong", "average", "weak"
+  examStrength      String?
+  sopStrength       String?
+  overallStrength   Int?      // 0-100 score
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+// ============== AI CONVERSATIONS ==============
+
+model Conversation {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  title     String?
+  context   String?   // JSON string with conversation context
+  
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  
+  messages  Message[]
+}
+
+model Message {
+  id             String       @id @default(uuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  
+  role           String       // "user" or "assistant"
+  content        String
+  
+  // Track AI actions taken
+  actionsTaken   String?      // JSON array of actions
+  
+  createdAt      DateTime     @default(now())
+}
+
+// ============== UNIVERSITIES ==============
+
+model University {
+  id              String   @id @default(uuid())
+  name            String
+  country         String
+  city            String?
+  ranking         Int?     // Global ranking
+  
+  // Programs offered (simplified)
+  programs        String[] // Array of program names
+  
+  // Cost info
+  tuitionMin      Int?     // Per year USD
+  tuitionMax      Int?
+  livingCostMin   Int?
+  livingCostMax   Int?
+  
+  // Requirements (general)
+  minGpa          Float?
+  ieltsMin        Float?
+  toeflMin        Int?
+  greRequired     Boolean  @default(false)
+  gmatRequired    Boolean  @default(false)
+  
+  // Deadlines (simplified)
+  fallDeadline    String?  // e.g., "January 15"
+  springDeadline  String?
+  
+  // Additional info
+  acceptanceRate  Float?   // Percentage
+  scholarships    Boolean  @default(false)
+  
+  website         String?
+  imageUrl        String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  shortlistedBy   ShortlistedUniversity[]
+}
+
+// ============== USER'S SHORTLISTED UNIVERSITIES ==============
+
+model ShortlistedUniversity {
+  id            String     @id @default(uuid())
+  userId        String
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  universityId  String
+  university    University @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  
+  // Category assigned by AI
+  category      String     // "dream", "target", "safe"
+  
+  // AI-generated insights
+  fitReason     String?    // Why this university fits
+  risks         String?    // Potential risks
+  
+  // Acceptance chance (AI calculated)
+  acceptanceChance String? // "low", "medium", "high"
+  
+  // Locking
+  isLocked      Boolean    @default(false)
+  lockedAt      DateTime?
+  
+  // Application tracking
+  applicationStatus String? // "not_started", "in_progress", "submitted", "accepted", "rejected"
+  
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  
+  @@unique([userId, universityId])
+}
+
+// ============== TASKS / TO-DO ==============
+
+model Task {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  title       String
+  description String?
+  category    String   // "exam", "document", "application", "research", "other"
+  priority    String   @default("medium") // "high", "medium", "low"
+  
+  // Linking to university if applicable
+  universityId String?
+  
+  dueDate     DateTime?
+  isCompleted Boolean  @default(false)
+  completedAt DateTime?
+  
+  // AI generated
+  isAiGenerated Boolean @default(false)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
