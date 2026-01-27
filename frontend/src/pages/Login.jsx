@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { GraduationCap, Mail, Lock, ArrowRight, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useAuth } from '../context/AuthContext';
 import { authAPI } from '../services/api';
 
 const Login = () => {
@@ -10,14 +11,15 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      // Cookie-based login
-      await authAPI.login({ email, password });
+      // Use context login - this calls API AND updates auth state
+      await login(email, password);
       toast.success('Welcome back!');
       navigate('/dashboard', { replace: true });
     } catch (error) {
@@ -55,7 +57,7 @@ const Login = () => {
             Continue your study abroad journey
           </p>
 
-          {/* Google Login Button (IDENTICAL STYLE) */}
+          {/* Google Login Button */}
           <button
             onClick={handleGoogleLogin}
             className="w-full flex items-center justify-center gap-3 px-6 py-3 bg-white text-gray-800 font-medium rounded-xl border border-gray-200 hover:bg-gray-100 transition-colors mb-6"
@@ -120,7 +122,7 @@ const Login = () => {
           </form>
 
           <p className="mt-8 text-center text-dark-400">
-            Don’t have an account?{' '}
+            Don't have an account?{' '}
             <Link
               to="/signup"
               className="text-primary-400 hover:text-primary-300 font-medium"
