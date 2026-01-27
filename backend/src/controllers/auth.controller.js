@@ -14,6 +14,17 @@ const generateToken = (userId) => {
 };
 
 // ==========================
+// COOKIE OPTIONS (centralized for consistency)
+// ==========================
+const getCookieOptions = () => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production', // true in production
+  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  path: '/',
+});
+
+// ==========================
 // SIGNUP
 // ==========================
 const signup = async (req, res) => {
@@ -87,12 +98,7 @@ const login = async (req, res) => {
 
     const token = generateToken(user.id);
 
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'none',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    res.cookie('token', token, getCookieOptions());
 
     return res.json({
       success: true,
@@ -124,12 +130,7 @@ const googleCallback = async (req, res) => {
     const user = req.user;
     const token = generateToken(user.id);
 
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'none',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    res.cookie('token', token, getCookieOptions());
 
     return res.redirect(`${process.env.FRONTEND_URL}/dashboard`);
   } catch (error) {
@@ -164,13 +165,14 @@ const getMe = async (req, res) => {
 };
 
 // ==========================
-// LOGOUT 🔥🔥🔥 (THIS FIXES AUTO-LOGIN)
+// LOGOUT
 // ==========================
 const logout = (req, res) => {
   res.clearCookie('token', {
     httpOnly: true,
-    secure: true,
-    sameSite: 'none',
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    path: '/',
   });
 
   return res.json({
@@ -203,8 +205,6 @@ module.exports = {
   login,
   googleCallback,
   getMe,
-  logout,        // 👈 REQUIRED
+  logout,
   forgotPassword,
 };
-
-

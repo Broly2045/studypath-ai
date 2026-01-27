@@ -23,10 +23,29 @@ const app = express();
  * ======================
  */
 
+// ✅ Trust proxy (required for secure cookies on Render/Heroku)
+app.set('trust proxy', 1);
+
 // ✅ CORS (must allow credentials)
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  'https://studypath-ai.vercel.app',
+  'http://localhost:5173',
+].filter(Boolean);
+
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL, // e.g. https://studypath-ai.vercel.app
+    origin: function (origin, callback) {
+      // Allow requests with no origin (mobile apps, curl, etc.)
+      if (!origin) return callback(null, true);
+      
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        console.log('Blocked by CORS:', origin);
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     credentials: true,
   })
 );
@@ -98,6 +117,7 @@ app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`🔐 Cookie-based auth enabled`);
   console.log(`📍 Health check: /api/health`);
+  console.log(`🌐 Allowed origins:`, allowedOrigins);
 });
 
 module.exports = app;
