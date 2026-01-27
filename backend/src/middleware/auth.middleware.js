@@ -3,22 +3,20 @@ const prisma = require('../config/database');
 
 const authMiddleware = async (req, res, next) => {
   try {
-    // Get token from header
-    const authHeader = req.headers.authorization;
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // ✅ Read token from HTTP-only cookie
+    const token = req.cookies?.token;
+
+    if (!token) {
       return res.status(401).json({
         success: false,
-        message: 'Access denied. No token provided.',
+        message: 'Not authenticated.',
       });
     }
 
-    const token = authHeader.split(' ')[1];
-
-    // Verify token
+    // Verify JWT
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Get user from database
+    // Fetch user from DB
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
       include: { profile: true },
@@ -35,26 +33,15 @@ const authMiddleware = async (req, res, next) => {
     req.user = user;
     next();
   } catch (error) {
-    if (error.name === 'JsonWebTokenError') {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid token.',
-      });
-    }
-    if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({
-        success: false,
-        message: 'Token expired.',
-      });
-    }
-    return res.status(500).json({
+    console.error('Auth middleware error:', error);
+    return res.status(401).json({
       success: false,
-      message: 'Authentication error.',
+      message: 'Invalid or expired token.',
     });
   }
 };
 
-// Middleware to check if onboarding is completed
+// Require onboarding completion
 const requireOnboarding = (req, res, next) => {
   if (!req.user.onboardingCompleted) {
     return res.status(403).json({
@@ -66,7 +53,7 @@ const requireOnboarding = (req, res, next) => {
   next();
 };
 
-// Middleware to check minimum stage requirement
+// Require minimum stage
 const requireStage = (minStage) => {
   return (req, res, next) => {
     if (req.user.currentStage < minStage) {
@@ -82,4 +69,8 @@ const requireStage = (minStage) => {
   };
 };
 
-module.exports = { authMiddleware, requireOnboarding, requireStage };
+module.exports = {
+  authMiddleware,
+  requireOnboarding,
+  requireStage,
+};
