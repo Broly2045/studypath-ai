@@ -87,7 +87,6 @@ const login = async (req, res) => {
 
     const token = generateToken(user.id);
 
-    // ✅ SET COOKIE
     res.cookie('token', token, {
       httpOnly: true,
       secure: true,
@@ -165,7 +164,23 @@ const getMe = async (req, res) => {
 };
 
 // ==========================
-// FORGOT PASSWORD (PLACEHOLDER)
+// LOGOUT 🔥🔥🔥 (THIS FIXES AUTO-LOGIN)
+// ==========================
+const logout = (req, res) => {
+  res.clearCookie('token', {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'none',
+  });
+
+  return res.json({
+    success: true,
+    message: 'Logged out successfully.',
+  });
+};
+
+// ==========================
+// FORGOT PASSWORD
 // ==========================
 const forgotPassword = async (req, res) => {
   try {
@@ -188,6 +203,8 @@ module.exports = {
   login,
   googleCallback,
   getMe,
-  forgotPassword, // ✅ THIS FIXES THE CRASH
+  logout,        // 👈 REQUIRED
+  forgotPassword,
 };
+
 

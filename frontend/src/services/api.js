@@ -11,17 +11,15 @@ const api = axios.create({
   },
 });
 
-// ❌ REMOVE token injection (cookies handle auth)
-
-// ❌ REMOVE forced redirect on 401
-// Let React handle auth state instead
-
 // ---------- AUTH API ----------
 export const authAPI = {
   signup: (data) => api.post('/auth/signup', data),
   login: (data) => api.post('/auth/login', data),
   getMe: () => api.get('/auth/me'),
   forgotPassword: (email) => api.post('/auth/forgot-password', { email }),
+
+  // 🔥 NEW: REAL LOGOUT (clears cookie on backend)
+  logout: () => api.post('/auth/logout'),
 
   // Google OAuth redirect
   googleAuth: () => `${API_URL}/auth/google`,

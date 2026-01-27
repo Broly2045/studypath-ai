@@ -6,7 +6,9 @@ const { authMiddleware } = require('../middleware/auth.middleware');
 
 const router = express.Router();
 
+// ==========================
 // Validation middleware
+// ==========================
 const validate = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -18,6 +20,10 @@ const validate = (req, res, next) => {
   }
   next();
 };
+
+// ==========================
+// AUTH ROUTES
+// ==========================
 
 // @route   POST /api/auth/signup
 router.post(
@@ -47,6 +53,10 @@ router.post(
   authController.login
 );
 
+// ==========================
+// GOOGLE OAUTH
+// ==========================
+
 // @route   GET /api/auth/google
 router.get(
   '/google',
@@ -66,8 +76,19 @@ router.get(
   authController.googleCallback
 );
 
+// ==========================
+// SESSION / USER
+// ==========================
+
 // @route   GET /api/auth/me
 router.get('/me', authMiddleware, authController.getMe);
+
+// @route   POST /api/auth/logout  🔥 NEW
+router.post('/logout', authController.logout);
+
+// ==========================
+// PASSWORD
+// ==========================
 
 // @route   POST /api/auth/forgot-password
 router.post(
