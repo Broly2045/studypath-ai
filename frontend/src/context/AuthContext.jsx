@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { authAPI } from '../services/api';
 
 const AuthContext = createContext(null);
@@ -6,81 +6,60 @@ const AuthContext = createContext(null);
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
+  // 🔍 Check auth on app load
   useEffect(() => {
     checkAuth();
   }, []);
 
   const checkAuth = async () => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      setLoading(false);
-      return;
-    }
-
     try {
       const response = await authAPI.getMe();
       setUser(response.data.data.user);
-      setIsAuthenticated(true);
     } catch (error) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+      // Not authenticated (401 is expected)
+      setUser(null);
     } finally {
       setLoading(false);
     }
   };
 
+  // 🔐 Login (cookie is set by backend)
   const login = async (email, password) => {
-    const response = await authAPI.login({ email, password });
-    const { user, token } = response.data.data;
-    
-    localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(user));
-    
-    setUser(user);
-    setIsAuthenticated(true);
-    
-    return user;
+    await authAPI.login({ email, password });
+    await checkAuth(); // refresh user from backend
   };
 
-  const signup = async (fullName, email, password) => {
-    const response = await authAPI.signup({ fullName, email, password });
-    const { user, token } = response.data.data;
-    
-    localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(user));
-    
-    setUser(user);
-    setIsAuthenticated(true);
-    
-    return user;
+  // 📝 Signup (NO auto-login unless backend supports it)
+  const signup = async (data) => {
+    await authAPI.signup(data);
   };
 
-  const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    setUser(null);
-    setIsAuthenticated(false);
-  };
-
-  const updateUser = (userData) => {
-    setUser((prev) => ({ ...prev, ...userData }));
-    localStorage.setItem('user', JSON.stringify({ ...user, ...userData }));
+  // 🚪 Logout (requires backend endpoint ideally)
+  const logout = async () => {
+    try {
+      await authAPI.logout?.(); // optional if you add backend logout
+    } catch {
+      // ignore
+    } finally {
+      setUser(null);
+    }
   };
 
   const value = {
     user,
     loading,
-    isAuthenticated,
     login,
     signup,
     logout,
-    updateUser,
-    checkAuth,
+    refreshUser: checkAuth,
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
 export const useAuth = () => {
