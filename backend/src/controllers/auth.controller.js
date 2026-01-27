@@ -137,20 +137,38 @@ const login = async (req, res) => {
 
 // @desc    Google OAuth callback
 // @route   GET /api/auth/google/callback
+// @desc    Google OAuth callback
+// @route   GET /api/auth/google/callback
 const googleCallback = async (req, res) => {
   try {
     const user = req.user;
+
+    if (!user) {
+      return res.redirect(
+        `${process.env.FRONTEND_URL}/login?error=google_auth_failed`
+      );
+    }
+
     const token = generateToken(user.id);
 
-    // Redirect to frontend with token
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-    res.redirect(`${frontendUrl}/auth/callback?token=${token}`);
+    // ✅ Set JWT in secure cookie
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: true,        // REQUIRED for HTTPS (Vercel)
+      sameSite: 'none',    // REQUIRED for cross-domain
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    // ✅ Redirect to REAL frontend route
+    return res.redirect(`${process.env.FRONTEND_URL}/dashboard`);
   } catch (error) {
     console.error('Google callback error:', error);
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-    res.redirect(`${frontendUrl}/auth/callback?error=auth_failed`);
+    return res.redirect(
+      `${process.env.FRONTEND_URL}/login?error=server_error`
+    );
   }
 };
+
 
 // @desc    Get current user
 // @route   GET /api/auth/me
