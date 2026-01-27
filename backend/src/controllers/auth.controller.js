@@ -2,7 +2,9 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const prisma = require('../config/database');
 
-// Generate JWT
+// ==========================
+// GENERATE JWT
+// ==========================
 const generateToken = (userId) => {
   return jwt.sign(
     { userId },
@@ -57,7 +59,7 @@ const signup = async (req, res) => {
 };
 
 // ==========================
-// LOGIN (🔥 FIXED)
+// LOGIN (COOKIE-BASED)
 // ==========================
 const login = async (req, res) => {
   try {
@@ -85,11 +87,11 @@ const login = async (req, res) => {
 
     const token = generateToken(user.id);
 
-    // ✅ SET COOKIE (THIS IS THE MISSING PIECE)
+    // ✅ SET COOKIE
     res.cookie('token', token, {
       httpOnly: true,
-      secure: true,        // required for HTTPS (Vercel)
-      sameSite: 'none',    // required for cross-site cookies
+      secure: true,
+      sameSite: 'none',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
@@ -116,7 +118,7 @@ const login = async (req, res) => {
 };
 
 // ==========================
-// GOOGLE CALLBACK (already correct)
+// GOOGLE OAUTH CALLBACK
 // ==========================
 const googleCallback = async (req, res) => {
   try {
@@ -162,9 +164,30 @@ const getMe = async (req, res) => {
   }
 };
 
+// ==========================
+// FORGOT PASSWORD (PLACEHOLDER)
+// ==========================
+const forgotPassword = async (req, res) => {
+  try {
+    return res.json({
+      success: true,
+      message:
+        'If an account exists with this email, password reset instructions will be sent.',
+    });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error processing request.',
+    });
+  }
+};
+
 module.exports = {
   signup,
   login,
   googleCallback,
   getMe,
+  forgotPassword, // ✅ THIS FIXES THE CRASH
 };
+
