@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -12,7 +12,9 @@ import {
   Check,
   Sparkles,
   MessageSquare,
-  Loader2
+  Loader2,
+  Mic,
+  MicOff
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { profileAPI, aiAPI } from '../services/api';
@@ -42,6 +44,15 @@ const Onboarding = () => {
   const [mode, setMode] = useState(null);
   const [currentSection, setCurrentSection] = useState(0);
   const [loading, setLoading] = useState(false);
+  
+  // Refs for auto-scroll and voice
+  const messagesEndRef = useRef(null);
+  const chatContainerRef = useRef(null);
+  
+  // Voice input state
+  const [isListening, setIsListening] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
+  const recognitionRef = useRef(null);
   
   const [formData, setFormData] = useState({
     educationLevel: '',
@@ -73,6 +84,74 @@ const Onboarding = () => {
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
   const [aiSection, setAiSection] = useState('academic');
+
+  // Initialize speech recognition
+  useEffect(() => {
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      setSpeechSupported(true);
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = false;
+      recognitionRef.current.interimResults = true;
+      recognitionRef.current.lang = 'en-US';
+
+      recognitionRef.current.onresult = (event) => {
+        const transcript = Array.from(event.results)
+          .map(result => result[0])
+          .map(result => result.transcript)
+          .join('');
+        
+        setChatInput(transcript);
+      };
+
+      recognitionRef.current.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        setIsListening(false);
+        if (event.error === 'not-allowed') {
+          toast.error('Microphone access denied. Please enable it in your browser settings.');
+        }
+      };
+
+      recognitionRef.current.onend = () => {
+        setIsListening(false);
+      };
+    }
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    };
+  }, []);
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    scrollToBottom();
+  }, [chatMessages, chatLoading]);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const toggleListening = () => {
+    if (!speechSupported) {
+      toast.error('Voice input is not supported in your browser. Try Chrome or Edge.');
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    } else {
+      try {
+        recognitionRef.current.start();
+        setIsListening(true);
+      } catch (error) {
+        console.error('Error starting speech recognition:', error);
+        toast.error('Could not start voice input. Please try again.');
+      }
+    }
+  };
 
   const updateFormData = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -124,6 +203,12 @@ const Onboarding = () => {
   const handleAIChat = async (e) => {
     e.preventDefault();
     if (!chatInput.trim() || chatLoading) return;
+
+    // Stop listening if currently recording
+    if (isListening) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    }
 
     const userMessage = chatInput.trim();
     setChatInput('');
@@ -223,7 +308,7 @@ const Onboarding = () => {
             </div>
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto px-6 py-8">
+        <div ref={chatContainerRef} className="flex-1 overflow-y-auto px-6 py-8">
           <div className="max-w-3xl mx-auto space-y-4">
             <AnimatePresence>
               {chatMessages.map((msg, i) => (
@@ -242,13 +327,44 @@ const Onboarding = () => {
                 </div>
               </div>
             )}
+            {/* Auto-scroll anchor */}
+            <div ref={messagesEndRef} />
           </div>
         </div>
         <div className="border-t border-dark-800 px-6 py-4">
           <form onSubmit={handleAIChat} className="max-w-3xl mx-auto flex gap-3">
-            <input type="text" value={chatInput} onChange={(e) => setChatInput(e.target.value)} placeholder="Type your response..." className="input-field flex-1" disabled={chatLoading} />
+            <div className="flex-1 relative">
+              <input 
+                type="text" 
+                value={chatInput} 
+                onChange={(e) => setChatInput(e.target.value)} 
+                placeholder={isListening ? "Listening..." : "Type your response..."} 
+                className="input-field w-full pr-12" 
+                disabled={chatLoading} 
+              />
+              {/* Voice Input Button */}
+              <button
+                type="button"
+                onClick={toggleListening}
+                disabled={chatLoading}
+                className={`absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-lg transition-all ${
+                  isListening 
+                    ? 'bg-red-500/20 text-red-400 animate-pulse' 
+                    : 'hover:bg-dark-700 text-dark-400 hover:text-white'
+                } ${chatLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                title={isListening ? "Stop listening" : "Voice input"}
+              >
+                {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+              </button>
+            </div>
             <button type="submit" disabled={chatLoading || !chatInput.trim()} className="btn-primary px-6">Send</button>
           </form>
+          {/* Voice input hint */}
+          {speechSupported && (
+            <p className="text-center text-xs text-dark-500 mt-2">
+              {isListening ? '🎤 Speak now...' : 'Tip: Click the mic icon to use voice input'}
+            </p>
+          )}
         </div>
       </div>
     );
