@@ -14,7 +14,8 @@ import {
   MessageSquare,
   Loader2,
   Mic,
-  MicOff
+  MicOff,
+  X
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { profileAPI, aiAPI } from '../services/api';
@@ -182,6 +183,9 @@ const Onboarding = () => {
   const handleBack = () => {
     if (currentSection > 0) {
       setCurrentSection((prev) => prev - 1);
+    } else {
+      // If on first section, go back to mode selection
+      goBackToModeSelection();
     }
   };
 
@@ -244,6 +248,18 @@ const Onboarding = () => {
     }]);
   };
 
+  const goBackToModeSelection = () => {
+    if (isListening && recognitionRef.current) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    }
+    setMode(null);
+    setChatMessages([]);
+    setChatInput('');
+    setAiSection('academic');
+    setCurrentSection(0);
+  };
+
   if (!mode) {
     return (
       <div className="min-h-screen flex items-center justify-center px-6 py-12">
@@ -293,6 +309,14 @@ const Onboarding = () => {
         <div className="border-b border-dark-800 px-6 py-4">
           <div className="max-w-3xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-3">
+              {/* Back Button */}
+              <button 
+                onClick={goBackToModeSelection}
+                className="p-2 rounded-lg hover:bg-dark-800 transition-colors text-dark-400 hover:text-white"
+                title="Go back"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
               <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-accent-500 rounded-xl flex items-center justify-center">
                 <Sparkles className="w-5 h-5 text-white" />
               </div>
@@ -574,8 +598,8 @@ const Onboarding = () => {
           {renderSectionContent()}
         </motion.div>
         <div className="flex justify-between">
-          <button onClick={handleBack} disabled={currentSection === 0} className={`btn-secondary flex items-center gap-2 ${currentSection === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}>
-            <ArrowLeft className="w-5 h-5" /> Back
+          <button onClick={handleBack} className="btn-secondary flex items-center gap-2">
+            <ArrowLeft className="w-5 h-5" /> {currentSection === 0 ? 'Change Method' : 'Back'}
           </button>
           <button onClick={handleNext} disabled={loading} className="btn-primary flex items-center gap-2">
             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : currentSection === SECTIONS.length - 1 ? <><span>Complete Setup</span> <Check className="w-5 h-5" /></> : <><span>Continue</span> <ArrowRight className="w-5 h-5" /></>}
