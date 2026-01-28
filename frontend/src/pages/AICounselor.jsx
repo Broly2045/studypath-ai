@@ -118,11 +118,23 @@ const AICounselor = () => {
     utterance.pitch = 1.0;
     utterance.volume = 1.0;
     
-    // Try to get a good English voice
+    // Try to get a good female English voice
     const voices = speechSynthRef.current.getVoices();
     const preferredVoice = voices.find(voice => 
-      voice.lang.includes('en') && (voice.name.includes('Google') || voice.name.includes('Samantha') || voice.name.includes('Microsoft'))
-    ) || voices.find(voice => voice.lang.includes('en'));
+      voice.lang.includes('en') && (
+        voice.name.includes('Samantha') ||  // macOS female
+        voice.name.includes('Google UK English Female') ||
+        voice.name.includes('Google US English') ||
+        voice.name.includes('Microsoft Zira') ||  // Windows female
+        voice.name.includes('Microsoft Jenny') || // Windows 11 female
+        voice.name.includes('Female') ||
+        voice.name.includes('Fiona') ||  // macOS
+        voice.name.includes('Karen') ||  // macOS Australian
+        voice.name.includes('Moira')     // macOS Irish
+      )
+    ) || voices.find(voice => 
+      voice.lang.includes('en') && voice.name.toLowerCase().includes('female')
+    ) || voices.find(voice => voice.lang.includes('en-US'));
     
     if (preferredVoice) {
       utterance.voice = preferredVoice;

@@ -17,7 +17,8 @@ import {
   MicOff,
   X,
   Volume2,
-  VolumeX
+  VolumeX,
+  LogOut
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { profileAPI, aiAPI } from '../services/api';
@@ -43,7 +44,7 @@ const COUNTRIES = [
 
 const Onboarding = () => {
   const navigate = useNavigate();
-  const { user, updateUser } = useAuth();
+  const { user, updateUser, logout } = useAuth();
   const [mode, setMode] = useState(null);
   const [currentSection, setCurrentSection] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -155,11 +156,23 @@ const Onboarding = () => {
     utterance.pitch = 1.0;
     utterance.volume = 1.0;
     
-    // Try to get a good English voice
+    // Try to get a good female English voice
     const voices = speechSynthRef.current.getVoices();
     const preferredVoice = voices.find(voice => 
-      voice.lang.includes('en') && (voice.name.includes('Google') || voice.name.includes('Samantha') || voice.name.includes('Microsoft'))
-    ) || voices.find(voice => voice.lang.includes('en'));
+      voice.lang.includes('en') && (
+        voice.name.includes('Samantha') ||  // macOS female
+        voice.name.includes('Google UK English Female') ||
+        voice.name.includes('Google US English') ||
+        voice.name.includes('Microsoft Zira') ||  // Windows female
+        voice.name.includes('Microsoft Jenny') || // Windows 11 female
+        voice.name.includes('Female') ||
+        voice.name.includes('Fiona') ||  // macOS
+        voice.name.includes('Karen') ||  // macOS Australian
+        voice.name.includes('Moira')     // macOS Irish
+      )
+    ) || voices.find(voice => 
+      voice.lang.includes('en') && voice.name.toLowerCase().includes('female')
+    ) || voices.find(voice => voice.lang.includes('en-US'));
     
     if (preferredVoice) {
       utterance.voice = preferredVoice;
@@ -325,7 +338,17 @@ const Onboarding = () => {
 
   if (!mode) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-6 py-12">
+      <div className="min-h-screen flex items-center justify-center px-6 py-12 relative">
+        {/* Logout Button - Top Right */}
+        <button
+          onClick={logout}
+          className="absolute top-6 right-6 flex items-center gap-2 px-4 py-2 text-dark-400 hover:text-white hover:bg-dark-800 rounded-lg transition-all"
+          title="Logout"
+        >
+          <LogOut className="w-4 h-4" />
+          <span className="text-sm">Logout</span>
+        </button>
+
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-2xl w-full">
           <div className="text-center mb-12">
             <div className="w-16 h-16 bg-gradient-to-br from-primary-500 to-accent-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
