@@ -15,7 +15,9 @@ import {
   Loader2,
   Mic,
   MicOff,
-  X
+  X,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { profileAPI, aiAPI } from '../services/api';
@@ -54,6 +56,11 @@ const Onboarding = () => {
   const [isListening, setIsListening] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
   const recognitionRef = useRef(null);
+  
+  // Text-to-Speech state
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [ttsEnabled, setTtsEnabled] = useState(true);
+  const speechSynthRef = useRef(null);
   
   const [formData, setFormData] = useState({
     educationLevel: '',
@@ -118,12 +125,60 @@ const Onboarding = () => {
       };
     }
 
+    // Initialize speech synthesis
+    if ('speechSynthesis' in window) {
+      speechSynthRef.current = window.speechSynthesis;
+    }
+
     return () => {
       if (recognitionRef.current) {
         recognitionRef.current.stop();
       }
+      if (speechSynthRef.current) {
+        speechSynthRef.current.cancel();
+      }
     };
   }, []);
+
+  // Function to speak text
+  const speakText = (text) => {
+    if (!speechSynthRef.current || !ttsEnabled) return;
+    
+    // Cancel any ongoing speech
+    speechSynthRef.current.cancel();
+    
+    // Clean text for speech (remove emojis and special characters)
+    const cleanText = text.replace(/[\u{1F600}-\u{1F6FF}]/gu, '').replace(/[\u{2700}-\u{27BF}]/gu, '');
+    
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+    
+    // Try to get a good English voice
+    const voices = speechSynthRef.current.getVoices();
+    const preferredVoice = voices.find(voice => 
+      voice.lang.includes('en') && (voice.name.includes('Google') || voice.name.includes('Samantha') || voice.name.includes('Microsoft'))
+    ) || voices.find(voice => voice.lang.includes('en'));
+    
+    if (preferredVoice) {
+      utterance.voice = preferredVoice;
+    }
+    
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+    
+    speechSynthRef.current.speak(utterance);
+  };
+
+  // Stop speaking
+  const stopSpeaking = () => {
+    if (speechSynthRef.current) {
+      speechSynthRef.current.cancel();
+      setIsSpeaking(false);
+    }
+  };
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -224,6 +279,9 @@ const Onboarding = () => {
       const { response: aiResponse, sectionComplete } = response.data.data;
       
       setChatMessages((prev) => [...prev, { role: 'assistant', content: aiResponse }]);
+      
+      // Speak the AI response
+      speakText(aiResponse);
 
       if (sectionComplete) {
         const sectionIndex = SECTIONS.findIndex((s) => s.id === aiSection);
@@ -242,10 +300,13 @@ const Onboarding = () => {
 
   const startAIOnboarding = () => {
     setMode('ai');
+    const greeting = `Hi ${user?.fullName?.split(' ')[0] || 'there'}! 👋 I'm PathFinder, your AI counselor. I'll help you set up your profile through a quick conversation.\n\nLet's start with your academic background. What's your current education level? Are you a high school student, undergraduate, or have you already completed your bachelor's degree?`;
     setChatMessages([{
       role: 'assistant',
-      content: `Hi ${user?.fullName?.split(' ')[0] || 'there'}! 👋 I'm PathFinder, your AI counselor. I'll help you set up your profile through a quick conversation.\n\nLet's start with your academic background. What's your current education level? Are you a high school student, undergraduate, or have you already completed your bachelor's degree?`
+      content: greeting
     }]);
+    // Speak the greeting after a short delay
+    setTimeout(() => speakText(greeting), 500);
   };
 
   const goBackToModeSelection = () => {
@@ -253,6 +314,8 @@ const Onboarding = () => {
       recognitionRef.current.stop();
       setIsListening(false);
     }
+    // Stop any ongoing speech
+    stopSpeaking();
     setMode(null);
     setChatMessages([]);
     setChatInput('');
@@ -325,10 +388,25 @@ const Onboarding = () => {
                 <p className="text-sm text-dark-500">Setting up your profile</p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               {SECTIONS.map((section, i) => (
                 <div key={section.id} className={`w-2 h-2 rounded-full transition-all ${section.id === aiSection ? 'w-6 bg-primary-500' : SECTIONS.findIndex((s) => s.id === aiSection) > i ? 'bg-accent-500' : 'bg-dark-700'}`} />
               ))}
+              {/* Speaker Toggle */}
+              <button
+                onClick={() => {
+                  if (isSpeaking) stopSpeaking();
+                  setTtsEnabled(!ttsEnabled);
+                }}
+                className={`ml-2 p-2 rounded-lg transition-all ${
+                  ttsEnabled 
+                    ? 'hover:bg-dark-800 text-primary-400' 
+                    : 'hover:bg-dark-800 text-dark-500'
+                } ${isSpeaking ? 'animate-pulse' : ''}`}
+                title={ttsEnabled ? "Voice enabled (click to mute)" : "Voice disabled (click to enable)"}
+              >
+                {ttsEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+              </button>
             </div>
           </div>
         </div>
@@ -386,7 +464,7 @@ const Onboarding = () => {
           {/* Voice input hint */}
           {speechSupported && (
             <p className="text-center text-xs text-dark-500 mt-2">
-              {isListening ? '🎤 Speak now...' : 'Tip: Click the mic icon to use voice input'}
+              {isListening ? '🎤 Speak now...' : isSpeaking ? '🔊 PathFinder is speaking...' : '🎤 Click mic to speak • 🔊 Voice is ' + (ttsEnabled ? 'on' : 'off')}
             </p>
           )}
         </div>

@@ -13,7 +13,11 @@ import {
   University,
   ListTodo,
   Clock,
-  Zap
+  Zap,
+  Mic,
+  MicOff,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { aiAPI } from '../services/api';
@@ -29,6 +33,16 @@ const AICounselor = () => {
   const [showSidebar, setShowSidebar] = useState(true);
   const messagesEndRef = useRef(null);
 
+  // Voice input state
+  const [isListening, setIsListening] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
+  const recognitionRef = useRef(null);
+
+  // Text-to-Speech state
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [ttsEnabled, setTtsEnabled] = useState(true);
+  const speechSynthRef = useRef(null);
+
   useEffect(() => {
     fetchConversations();
   }, []);
@@ -36,6 +50,123 @@ const AICounselor = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Initialize speech recognition and synthesis
+  useEffect(() => {
+    // Speech Recognition (Voice Input)
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      setSpeechSupported(true);
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = false;
+      recognitionRef.current.interimResults = true;
+      recognitionRef.current.lang = 'en-US';
+
+      recognitionRef.current.onresult = (event) => {
+        const transcript = Array.from(event.results)
+          .map(result => result[0])
+          .map(result => result.transcript)
+          .join('');
+        
+        setInput(transcript);
+      };
+
+      recognitionRef.current.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        setIsListening(false);
+        if (event.error === 'not-allowed') {
+          toast.error('Microphone access denied. Please enable it in your browser settings.');
+        }
+      };
+
+      recognitionRef.current.onend = () => {
+        setIsListening(false);
+      };
+    }
+
+    // Speech Synthesis (TTS)
+    if ('speechSynthesis' in window) {
+      speechSynthRef.current = window.speechSynthesis;
+    }
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      if (speechSynthRef.current) {
+        speechSynthRef.current.cancel();
+      }
+    };
+  }, []);
+
+  // Function to speak text
+  const speakText = (text) => {
+    if (!speechSynthRef.current || !ttsEnabled) return;
+    
+    // Cancel any ongoing speech
+    speechSynthRef.current.cancel();
+    
+    // Clean text for speech (remove emojis and special characters)
+    const cleanText = text
+      .replace(/[\u{1F600}-\u{1F6FF}]/gu, '')
+      .replace(/[\u{2700}-\u{27BF}]/gu, '')
+      .replace(/[\u{1F900}-\u{1F9FF}]/gu, '')
+      .replace(/[\u{2600}-\u{26FF}]/gu, '');
+    
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+    
+    // Try to get a good English voice
+    const voices = speechSynthRef.current.getVoices();
+    const preferredVoice = voices.find(voice => 
+      voice.lang.includes('en') && (voice.name.includes('Google') || voice.name.includes('Samantha') || voice.name.includes('Microsoft'))
+    ) || voices.find(voice => voice.lang.includes('en'));
+    
+    if (preferredVoice) {
+      utterance.voice = preferredVoice;
+    }
+    
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+    
+    speechSynthRef.current.speak(utterance);
+  };
+
+  // Stop speaking
+  const stopSpeaking = () => {
+    if (speechSynthRef.current) {
+      speechSynthRef.current.cancel();
+      setIsSpeaking(false);
+    }
+  };
+
+  // Toggle voice input
+  const toggleListening = () => {
+    if (!speechSupported) {
+      toast.error('Voice input is not supported in your browser. Try Chrome or Edge.');
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    } else {
+      // Stop TTS if speaking
+      if (isSpeaking) {
+        stopSpeaking();
+      }
+      try {
+        recognitionRef.current.start();
+        setIsListening(true);
+      } catch (error) {
+        console.error('Error starting speech recognition:', error);
+        toast.error('Could not start voice input. Please try again.');
+      }
+    }
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -52,6 +183,8 @@ const AICounselor = () => {
 
   const loadConversation = async (conversationId) => {
     try {
+      // Stop any ongoing speech when switching conversations
+      stopSpeaking();
       const response = await aiAPI.getConversation(conversationId);
       setCurrentConversation(response.data.data.conversation);
       setMessages(response.data.data.conversation.messages);
@@ -61,6 +194,7 @@ const AICounselor = () => {
   };
 
   const startNewConversation = () => {
+    stopSpeaking();
     setCurrentConversation(null);
     setMessages([]);
   };
@@ -68,6 +202,15 @@ const AICounselor = () => {
   const handleSend = async (e) => {
     e.preventDefault();
     if (!input.trim() || loading) return;
+
+    // Stop listening if currently recording
+    if (isListening) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    }
+
+    // Stop any ongoing speech
+    stopSpeaking();
 
     const userMessage = input.trim();
     setInput('');
@@ -96,6 +239,9 @@ const AICounselor = () => {
         actions 
       };
       setMessages((prev) => [...prev, aiMsg]);
+
+      // Speak the AI response
+      speakText(aiResponse);
 
       // Show action notifications
       if (actions && actions.length > 0) {
@@ -203,6 +349,21 @@ const AICounselor = () => {
                 <Zap className="w-3 h-3" />
                 Takes Actions
               </div>
+              {/* Speaker Toggle */}
+              <button
+                onClick={() => {
+                  if (isSpeaking) stopSpeaking();
+                  setTtsEnabled(!ttsEnabled);
+                }}
+                className={`p-2 rounded-lg transition-all ${
+                  ttsEnabled 
+                    ? 'hover:bg-dark-800 text-primary-400' 
+                    : 'hover:bg-dark-800 text-dark-500'
+                } ${isSpeaking ? 'animate-pulse' : ''}`}
+                title={ttsEnabled ? "Voice enabled (click to mute)" : "Voice disabled (click to enable)"}
+              >
+                {ttsEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+              </button>
             </div>
           </div>
         </div>
@@ -222,6 +383,20 @@ const AICounselor = () => {
                   manage tasks, and guide your study abroad journey. <strong>I can also take actions</strong> like 
                   adding universities to your shortlist!
                 </p>
+
+                {/* Voice Feature Highlight */}
+                {speechSupported && (
+                  <div className="mb-8 p-4 bg-primary-500/10 border border-primary-500/30 rounded-xl max-w-md mx-auto">
+                    <div className="flex items-center justify-center gap-2 text-primary-400 mb-2">
+                      <Mic className="w-5 h-5" />
+                      <span className="font-medium">Voice Enabled!</span>
+                      <Volume2 className="w-5 h-5" />
+                    </div>
+                    <p className="text-sm text-dark-400">
+                      Click the mic to speak your questions. I'll respond with voice too!
+                    </p>
+                  </div>
+                )}
 
                 {/* Capabilities */}
                 <div className="grid md:grid-cols-3 gap-4 mb-8">
@@ -332,14 +507,30 @@ const AICounselor = () => {
         <div className="border-t border-dark-800 px-6 py-4">
           <form onSubmit={handleSend} className="max-w-4xl mx-auto">
             <div className="flex gap-3">
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask anything or give me a command..."
-                className="input-field flex-1"
-                disabled={loading}
-              />
+              <div className="flex-1 relative">
+                <input
+                  type="text"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder={isListening ? "Listening..." : "Ask anything or give me a command..."}
+                  className="input-field w-full pr-12"
+                  disabled={loading}
+                />
+                {/* Voice Input Button */}
+                <button
+                  type="button"
+                  onClick={toggleListening}
+                  disabled={loading}
+                  className={`absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-lg transition-all ${
+                    isListening 
+                      ? 'bg-red-500/20 text-red-400 animate-pulse' 
+                      : 'hover:bg-dark-700 text-dark-400 hover:text-white'
+                  } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  title={isListening ? "Stop listening" : "Voice input"}
+                >
+                  {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                </button>
+              </div>
               <button
                 type="submit"
                 disabled={loading || !input.trim()}
@@ -355,8 +546,16 @@ const AICounselor = () => {
                 )}
               </button>
             </div>
+            {/* Voice status hint */}
             <p className="text-xs text-dark-500 text-center mt-2">
-              PathFinder can take actions like adding tasks and shortlisting universities
+              {isListening 
+                ? '🎤 Speak now...' 
+                : isSpeaking 
+                  ? '🔊 PathFinder is speaking...' 
+                  : speechSupported 
+                    ? `🎤 Click mic to speak • 🔊 Voice is ${ttsEnabled ? 'on' : 'off'} • PathFinder can take actions!`
+                    : 'PathFinder can take actions like adding tasks and shortlisting universities'
+              }
             </p>
           </form>
         </div>
