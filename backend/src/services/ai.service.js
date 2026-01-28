@@ -9,6 +9,10 @@ const groq = new Groq({
 // Model to use (llama is fast and free)
 const MODEL = 'llama-3.1-8b-instant';
 
+// In-memory store for onboarding conversations (per user)
+// In production, you might want to use Redis or store in DB
+const onboardingConversations = new Map();
+
 // System prompt for the AI Counselor
 const getSystemPrompt = (user, profile, shortlistedUniversities, tasks) => {
   return `You are an expert AI Study Abroad Counselor named "PathFinder". You help students plan their international education journey.
@@ -369,7 +373,77 @@ const getConversation = async (conversationId, userId) => {
   });
 };
 
-// AI-powered onboarding conversation
+// Get onboarding system prompt
+const getOnboardingSystemPrompt = (user, profile, currentSection, collectedData) => {
+  return `You are PathFinder, a friendly AI Study Abroad Counselor conducting an onboarding interview.
+
+## STUDENT INFO
+Name: ${user.fullName}
+Current Section: ${currentSection}
+
+## ALREADY COLLECTED DATA (DO NOT ASK AGAIN!)
+${JSON.stringify(collectedData, null, 2)}
+
+## CURRENT PROFILE IN DATABASE
+${JSON.stringify(profile, null, 2)}
+
+## SECTIONS & FIELDS TO COLLECT
+
+### Section: academic
+Fields needed:
+- educationLevel (ask: "Are you a high school student, undergraduate, or have completed bachelor's/master's?") → Values: high_school, bachelors, masters
+- currentDegree (ask: "What's your current degree/program?") → e.g., "B.Tech", "BBA", "B.Sc"
+- major (ask: "What's your major or field?") → e.g., "Computer Science"
+- graduationYear (ask: "What year did/will you graduate?") → e.g., 2024
+- gpa (ask: "What's your GPA or percentage?") → e.g., 8.5, 3.7
+- gpaScale (ask: "Is that out of 10, 4, or 100?") → Values: 10, 4, 100
+
+### Section: goals  
+Fields needed:
+- intendedDegree (ask: "What degree do you want to pursue abroad?") → Values: bachelors, masters, mba, phd
+- fieldOfStudy (ask: "What field do you want to study?") → e.g., "Data Science"
+- targetIntakeYear (ask: "Which year are you targeting?") → e.g., 2025
+- targetIntakeSeason (ask: "Fall, Spring, or Summer intake?") → Values: fall, spring, summer
+- preferredCountries (ask: "Which countries interest you?") → e.g., "USA, UK, Canada"
+
+### Section: budget
+Fields needed:
+- budgetMin (ask: "What's your minimum budget per year in USD?") → e.g., 20000
+- budgetMax (ask: "What's your maximum budget per year in USD?") → e.g., 50000
+- fundingPlan (ask: "How do you plan to fund your education?") → Values: self_funded, scholarship, loan, mixed
+
+### Section: exams
+Fields needed:
+- ieltsStatus (ask: "Have you taken or are you preparing for IELTS?") → Values: not_started, preparing, scheduled, completed
+- ieltsScore (only if completed, ask: "What was your score?") → e.g., 7.5
+- toeflStatus (ask: "What about TOEFL?") → Values: not_started, preparing, scheduled, completed
+- greStatus (ask: "Have you taken or planning GRE?") → Values: not_started, preparing, completed, not_required
+- gmatStatus (ask: "What about GMAT?") → Values: not_started, preparing, completed, not_required
+- sopStatus (ask: "Have you started your Statement of Purpose?") → Values: not_started, draft, ready
+
+## YOUR RULES - VERY IMPORTANT!
+
+1. **NEVER ask for information already in COLLECTED DATA or PROFILE** - Check both before asking anything!
+2. **Ask ONE question at a time** - Keep it conversational
+3. **When user answers, extract data using this format:**
+   [ONBOARD_DATA:fieldName|value]
+   Example: [ONBOARD_DATA:educationLevel|bachelors]
+   Example: [ONBOARD_DATA:gpa|8.5]
+   Example: [ONBOARD_DATA:preferredCountries|USA, UK, Canada]
+
+4. **After getting 2-3 answers in a section OR if all fields for current section are filled, mark complete:**
+   [SECTION_COMPLETE:${currentSection}]
+
+5. **Be encouraging and conversational** - Not robotic!
+6. **If user gives multiple pieces of info, extract ALL of them**
+7. **Keep responses SHORT - 2-3 sentences max**
+
+## WHAT TO DO NOW
+Look at the current section "${currentSection}" and check what fields are missing (not in collected data or profile).
+Ask for the NEXT missing field only. If section is complete, say so.`;
+};
+
+// AI-powered onboarding conversation - FIXED with conversation history
 const onboardingChat = async (userId, message, currentSection) => {
   try {
     const user = await prisma.user.findUnique({
@@ -377,49 +451,38 @@ const onboardingChat = async (userId, message, currentSection) => {
       include: { profile: true },
     });
 
-    const onboardingPrompt = `You are PathFinder, an AI Study Abroad Counselor conducting an onboarding interview.
+    // Get or initialize conversation history for this user
+    if (!onboardingConversations.has(userId)) {
+      onboardingConversations.set(userId, {
+        messages: [],
+        collectedData: {},
+      });
+    }
 
-CURRENT STUDENT: ${user.fullName}
-CURRENT SECTION: ${currentSection}
+    const userConversation = onboardingConversations.get(userId);
+    
+    // Add user message to history
+    userConversation.messages.push({
+      role: 'user',
+      content: message,
+    });
 
-You're gathering information through a friendly conversation. Based on the current section, ask relevant questions.
+    // Build the system prompt with collected data
+    const systemPrompt = getOnboardingSystemPrompt(
+      user, 
+      user.profile, 
+      currentSection,
+      userConversation.collectedData
+    );
 
-SECTIONS TO COVER:
-1. academic - Education level, degree, major, GPA, graduation year
-2. goals - Intended degree, field of study, target intake, preferred countries
-3. budget - Budget range, funding plan
-4. exams - IELTS/TOEFL status, GRE/GMAT status, SOP status
-
-RULES:
-1. Ask ONE question at a time
-2. Be conversational and encouraging
-3. When you get an answer, extract the data and include it as:
-   [ONBOARD_DATA:field_name|value]
-   
-   Valid fields:
-   - educationLevel (high_school, bachelors, masters)
-   - currentDegree, major, graduationYear, gpa, gpaScale
-   - intendedDegree (bachelors, masters, mba, phd)
-   - fieldOfStudy, targetIntakeYear, targetIntakeSeason (fall, spring, summer)
-   - preferredCountries (comma-separated)
-   - budgetMin, budgetMax (numbers in USD)
-   - fundingPlan (self_funded, scholarship, loan, mixed)
-   - ieltsStatus, toeflStatus, greStatus, gmatStatus, sopStatus (not_started, preparing, scheduled, completed)
-   - ieltsScore, toeflScore, greScore, gmatScore (numbers)
-
-4. After extracting data, acknowledge and move to next question
-5. If section is complete, say [SECTION_COMPLETE:${currentSection}]
-
-Current profile data:
-${JSON.stringify(user.profile, null, 2)}
-
-Student's message: "${message}"`;
+    // Build messages array with FULL conversation history
+    const messages = [
+      { role: 'system', content: systemPrompt },
+      ...userConversation.messages.slice(-20), // Last 20 messages to avoid token limit
+    ];
 
     const completion = await groq.chat.completions.create({
-      messages: [
-        { role: 'system', content: onboardingPrompt },
-        { role: 'user', content: message },
-      ],
+      messages,
       model: MODEL,
       temperature: 0.7,
       max_tokens: 512,
@@ -437,15 +500,19 @@ Student's message: "${message}"`;
       
       if (field === 'preferredCountries') {
         updates[field] = value.split(',').map(c => c.trim());
+        userConversation.collectedData[field] = updates[field];
       }
       else if (['budgetMin', 'budgetMax', 'graduationYear', 'targetIntakeYear', 'greScore', 'gmatScore', 'toeflScore'].includes(field)) {
         updates[field] = parseInt(value);
+        userConversation.collectedData[field] = updates[field];
       }
       else if (['gpa', 'gpaScale', 'ieltsScore'].includes(field)) {
         updates[field] = parseFloat(value);
+        userConversation.collectedData[field] = updates[field];
       }
       else {
         updates[field] = value;
+        userConversation.collectedData[field] = value;
       }
     }
 
@@ -455,6 +522,7 @@ Student's message: "${message}"`;
         where: { userId },
         data: updates,
       });
+      console.log('Updated profile with:', updates);
     }
 
     // Check for section complete
@@ -465,6 +533,18 @@ Student's message: "${message}"`;
       .replace(/\[ONBOARD_DATA:[^\]]+\]/g, '')
       .replace(/\[SECTION_COMPLETE:[^\]]+\]/g, '')
       .trim();
+
+    // Add AI response to history
+    userConversation.messages.push({
+      role: 'assistant',
+      content: cleanedResponse,
+    });
+
+    // If onboarding is complete (exams section done), clear the conversation memory
+    if (sectionComplete && currentSection === 'exams') {
+      onboardingConversations.delete(userId);
+      console.log('Onboarding complete, cleared conversation memory for user:', userId);
+    }
 
     return {
       response: cleanedResponse,
@@ -477,9 +557,15 @@ Student's message: "${message}"`;
   }
 };
 
+// Clear onboarding conversation (call when user restarts or leaves)
+const clearOnboardingConversation = (userId) => {
+  onboardingConversations.delete(userId);
+};
+
 module.exports = {
   chat,
   getConversations,
   getConversation,
   onboardingChat,
+  clearOnboardingConversation,
 };
