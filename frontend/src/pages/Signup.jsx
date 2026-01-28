@@ -9,6 +9,7 @@ import {
   ArrowRight,
   Loader2,
   Check,
+  AlertCircle,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { authAPI } from '../services/api';
@@ -18,6 +19,7 @@ const Signup = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
   const navigate = useNavigate();
 
   const passwordRequirements = [
@@ -26,11 +28,70 @@ const Signup = () => {
     { met: /[0-9]/.test(password), text: 'One number' },
   ];
 
+  // Email validation regex
+  const isValidEmail = (email) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  };
+
+  // Validate form
+  const validateForm = () => {
+    const newErrors = {};
+
+    // Full name validation
+    if (!fullName.trim()) {
+      newErrors.fullName = 'Full name is required';
+    } else if (fullName.trim().length < 2) {
+      newErrors.fullName = 'Name must be at least 2 characters';
+    }
+
+    // Email validation
+    if (!email.trim()) {
+      newErrors.email = 'Email is required';
+    } else if (!isValidEmail(email)) {
+      newErrors.email = 'Please enter a valid email address';
+    }
+
+    // Password validation
+    if (!password) {
+      newErrors.password = 'Password is required';
+    } else if (password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  // Clear error when user types
+  const handleFullNameChange = (e) => {
+    setFullName(e.target.value);
+    if (errors.fullName) {
+      setErrors((prev) => ({ ...prev, fullName: '' }));
+    }
+  };
+
+  const handleEmailChange = (e) => {
+    setEmail(e.target.value);
+    if (errors.email) {
+      setErrors((prev) => ({ ...prev, email: '' }));
+    }
+  };
+
+  const handlePasswordChange = (e) => {
+    setPassword(e.target.value);
+    if (errors.password) {
+      setErrors((prev) => ({ ...prev, password: '' }));
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (password.length < 6) {
-      toast.error('Password must be at least 6 characters');
+    // Clear previous errors
+    setErrors({});
+
+    // Validate form
+    if (!validateForm()) {
       return;
     }
 
@@ -41,7 +102,20 @@ const Signup = () => {
       toast.success('Account created successfully! Please log in.');
       navigate('/login', { replace: true });
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Signup failed');
+      const errorMessage = error.response?.data?.message || 'Signup failed';
+      
+      // Handle specific error messages
+      if (errorMessage.toLowerCase().includes('email') && errorMessage.toLowerCase().includes('exists')) {
+        setErrors({ email: 'An account with this email already exists' });
+      } else if (errorMessage.toLowerCase().includes('email') && errorMessage.toLowerCase().includes('taken')) {
+        setErrors({ email: 'This email is already registered' });
+      } else if (errorMessage.toLowerCase().includes('email') && errorMessage.toLowerCase().includes('invalid')) {
+        setErrors({ email: 'Please enter a valid email address' });
+      } else if (errorMessage.toLowerCase().includes('password')) {
+        setErrors({ password: errorMessage });
+      } else {
+        toast.error(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
@@ -53,7 +127,7 @@ const Signup = () => {
 
   return (
     <div className="min-h-screen flex">
-      {/* LEFT PANEL – VISUAL */}
+      {/* LEFT PANEL — VISUAL */}
       <div className="hidden lg:flex flex-1 items-center justify-center bg-gradient-to-br from-accent-900/30 to-dark-950 p-12">
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
@@ -92,7 +166,7 @@ const Signup = () => {
         </motion.div>
       </div>
 
-      {/* RIGHT PANEL – FORM */}
+      {/* RIGHT PANEL — FORM */}
       <div className="flex-1 flex items-center justify-center px-6 py-12">
         <motion.div
           initial={{ opacity: 0, x: 20 }}
@@ -145,10 +219,20 @@ const Signup = () => {
               <input
                 type="text"
                 value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                className="input-field"
-                required
+                onChange={handleFullNameChange}
+                className={`input-field ${errors.fullName ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' : ''}`}
+                placeholder="Enter your full name"
               />
+              {errors.fullName && (
+                <motion.p 
+                  initial={{ opacity: 0, y: -5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-2 text-sm text-red-400 flex items-center gap-1"
+                >
+                  <AlertCircle className="w-4 h-4" />
+                  {errors.fullName}
+                </motion.p>
+              )}
             </div>
 
             <div>
@@ -158,10 +242,20 @@ const Signup = () => {
               <input
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="input-field"
-                required
+                onChange={handleEmailChange}
+                className={`input-field ${errors.email ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' : ''}`}
+                placeholder="Enter your email"
               />
+              {errors.email && (
+                <motion.p 
+                  initial={{ opacity: 0, y: -5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-2 text-sm text-red-400 flex items-center gap-1"
+                >
+                  <AlertCircle className="w-4 h-4" />
+                  {errors.email}
+                </motion.p>
+              )}
             </div>
 
             <div>
@@ -171,12 +265,22 @@ const Signup = () => {
               <input
                 type="password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="input-field"
-                required
+                onChange={handlePasswordChange}
+                className={`input-field ${errors.password ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' : ''}`}
+                placeholder="Create a password"
               />
+              {errors.password && (
+                <motion.p 
+                  initial={{ opacity: 0, y: -5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-2 text-sm text-red-400 flex items-center gap-1"
+                >
+                  <AlertCircle className="w-4 h-4" />
+                  {errors.password}
+                </motion.p>
+              )}
 
-              {password && (
+              {password && !errors.password && (
                 <div className="mt-3 space-y-2">
                   {passwordRequirements.map((req) => (
                     <div
