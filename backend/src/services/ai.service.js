@@ -373,23 +373,13 @@ const getConversation = async (conversationId, userId) => {
   });
 };
 
-// Get onboarding system prompt
+// Simplified onboarding system prompt - much more concise
 const getOnboardingSystemPrompt = (user, profile, currentSection, collectedData, completedSections = []) => {
-  // Define required fields for each section
   const sectionFields = {
     academic: ['educationLevel', 'major', 'gpa'],
     goals: ['intendedDegree', 'fieldOfStudy', 'preferredCountries'],
     budget: ['budgetMin', 'budgetMax', 'fundingPlan'],
     exams: ['ieltsStatus', 'greStatus', 'sopStatus'],
-  };
-
-  // Check which fields are already filled
-  const getFilledFields = (section) => {
-    return sectionFields[section].filter(field => {
-      const value = collectedData[field] || profile?.[field];
-      if (Array.isArray(value)) return value.length > 0;
-      return value !== null && value !== undefined && value !== '';
-    });
   };
 
   const getMissingFields = (section) => {
@@ -400,68 +390,56 @@ const getOnboardingSystemPrompt = (user, profile, currentSection, collectedData,
     });
   };
 
+  const getFilledFields = (section) => {
+    return sectionFields[section].filter(field => {
+      const value = collectedData[field] || profile?.[field];
+      if (Array.isArray(value)) return value.length > 0;
+      return value !== null && value !== undefined && value !== '';
+    });
+  };
+
   const currentMissing = getMissingFields(currentSection);
   const currentFilled = getFilledFields(currentSection);
   const allSectionsDone = currentSection === 'exams' && currentMissing.length === 0;
 
-  return `You are PathFinder, a friendly AI Study Abroad Counselor conducting an onboarding interview.
+  return `You are PathFinder, a friendly AI Study Abroad Counselor. Keep responses SHORT (2-3 sentences max).
 
-## STUDENT INFO
-Name: ${user.fullName}
-Current Section: ${currentSection}
-Completed Sections: ${completedSections.length > 0 ? completedSections.join(', ') : 'None yet'}
+STUDENT: ${user.fullName}
+SECTION: ${currentSection}
+FILLED: ${currentFilled.join(', ') || 'None'}
+MISSING: ${currentMissing.join(', ') || 'COMPLETE'}
 
-## SECTION PROGRESS FOR "${currentSection}"
-- Fields FILLED: ${currentFilled.length > 0 ? currentFilled.join(', ') : 'None'}
-- Fields MISSING: ${currentMissing.length > 0 ? currentMissing.join(', ') : 'NONE - SECTION IS COMPLETE!'}
+## FIELD VALUES (use these for valid options)
+- educationLevel: high_school, bachelors, masters
+- intendedDegree: bachelors, masters, mba, phd
+- fundingPlan: self_funded, scholarship, loan, mixed
+- ieltsStatus/greStatus: not_started, preparing, scheduled, completed, not_required
+- sopStatus: not_started, draft, ready
+- preferredCountries: USA, UK, CAN, AUS, GER, NLD, IRL, SGP
 
-## ALREADY COLLECTED DATA
-${JSON.stringify(collectedData, null, 2)}
-
-## PROFILE IN DATABASE
-${JSON.stringify(profile, null, 2)}
-
-## FIELDS BY SECTION
-
-### academic: educationLevel, major, gpa
-### goals: intendedDegree, fieldOfStudy, preferredCountries
-### budget: budgetMin, budgetMax, fundingPlan
-### exams: ieltsStatus, greStatus, sopStatus
-
-## EXTRACTION FORMAT - CRITICAL: YOU MUST ALWAYS USE THESE TAGS!
-⚠️ MANDATORY: Every time the user provides information, you MUST include extraction tags.
-Format: [ONBOARD_DATA:fieldName|value]
+## EXTRACTION RULES - MANDATORY
+When user gives info, ALWAYS include: [ONBOARD_DATA:fieldName|value]
 
 Examples:
-- User says "I have a bachelor's degree" → You respond: "Great! [ONBOARD_DATA:educationLevel|bachelors] What was your major?"
-- User says "I got 8.5 GPA" → You respond: "Excellent! [ONBOARD_DATA:gpa|8.5] That's a strong academic record."
-- User says "USA, UK and Canada" → You respond: "Perfect! [ONBOARD_DATA:preferredCountries|USA, UK, Canada] Those are great choices."
+- "bachelor's degree" → [ONBOARD_DATA:educationLevel|bachelors]
+- "computer science" → [ONBOARD_DATA:major|computer science]  
+- "8.5 GPA" → [ONBOARD_DATA:gpa|8.5]
+- "masters" → [ONBOARD_DATA:intendedDegree|masters]
+- "USA and UK" → [ONBOARD_DATA:preferredCountries|USA, UK]
+- "30000 budget" → [ONBOARD_DATA:budgetMin|30000]
+- "self funded" → [ONBOARD_DATA:fundingPlan|self_funded]
+- "not started IELTS" → [ONBOARD_DATA:ieltsStatus|not_started]
 
-## SECTION COMPLETE FORMAT
-When ALL required fields for the section are filled: [SECTION_COMPLETE:${currentSection}]
+## SECTION COMPLETE
+When all fields for current section are filled: [SECTION_COMPLETE:${currentSection}]
 
-⚠️ CRITICAL RULES - FOLLOW THESE EXACTLY:
-1. **ALWAYS** include [ONBOARD_DATA:...] tags when user provides ANY information
-2. Include the tags in the SAME message as your response, not separately
-3. If "Fields MISSING" says "NONE", IMMEDIATELY output [SECTION_COMPLETE:${currentSection}]
-4. NEVER skip the tags - they are how data gets saved to the database
-5. Extract EVERY piece of data the user mentions in one message
-6. Ask only ONE question at a time, then wait for response
-7. Keep conversational parts to 2-3 sentences max
-
-❌ WRONG (missing tag):
-User: "I want to do a Master's degree"
-You: "That's great! What field are you interested in?"
-
-✅ CORRECT (includes tag):
-User: "I want to do a Master's degree"
-You: "Perfect! [ONBOARD_DATA:intendedDegree|masters] What field are you interested in?"
-
-## YOUR ACTION NOW
+## YOUR TASK NOW
 ${currentMissing.length === 0 
-  ? `IMPORTANT: Section "${currentSection}" is COMPLETE! Acknowledge briefly and output [SECTION_COMPLETE:${currentSection}]`
-  : `Ask about: ${currentMissing[0]}`}
-${allSectionsDone ? '\n\nALL SECTIONS COMPLETE! Congratulate the user and include [SECTION_COMPLETE:exams]' : ''}`;
+  ? `Section "${currentSection}" is COMPLETE! Say a brief congratulations and output [SECTION_COMPLETE:${currentSection}]`
+  : `Ask about: ${currentMissing[0]}. Be conversational and brief.`}
+${allSectionsDone ? '\n\nALL DONE! Congratulate user and include [SECTION_COMPLETE:exams]' : ''}
+
+IMPORTANT: Always complete your sentences. Never leave a response unfinished.`;
 };
 
 // AI-powered onboarding conversation - FIXED with conversation history
@@ -498,17 +476,17 @@ const onboardingChat = async (userId, message, currentSection) => {
       userConversation.completedSections || []
     );
 
-    // Build messages array with FULL conversation history
+    // Build messages array with conversation history (limit to last 10 for efficiency)
     const messages = [
       { role: 'system', content: systemPrompt },
-      ...userConversation.messages.slice(-20), // Last 20 messages to avoid token limit
+      ...userConversation.messages.slice(-10),
     ];
 
     const completion = await groq.chat.completions.create({
       messages,
       model: MODEL,
       temperature: 0.7,
-      max_tokens: 512,
+      max_tokens: 1024, // Increased from 512
     });
 
     const aiResponse = completion.choices[0]?.message?.content || '';
