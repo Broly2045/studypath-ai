@@ -199,27 +199,73 @@ const Universities = () => {
                         .filter((r) => r.category === category)
                         .map((uni, i) => (
                           <motion.div
-                            key={uni.name}
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: i * 0.05 }}
-                            className="glass-card p-5 mb-4"
-                          >
-                            <h4 className="font-semibold mb-1">{uni.name}</h4>
-                            <p className="text-sm text-dark-400 mb-2">
-                              <Globe className="inline w-3 h-3 mr-1" />
-                              {uni.city}, {uni.country}
-                            </p>
-                            <p className="text-sm text-dark-400 mb-3">{uni.fitReason}</p>
+  key={uni.name}
+  initial={{ opacity: 0, y: 20 }}
+  animate={{ opacity: 1, y: 0 }}
+  transition={{ delay: i * 0.05 }}
+  className="glass-card p-5 mb-4 hover:border-primary-500/40 transition-all"
+>
+  {/* Header */}
+  <div className="flex items-start justify-between mb-2">
+    <div>
+      <h4 className="font-semibold">{uni.name}</h4>
+      <p className="text-sm text-dark-400 flex items-center gap-1">
+        <Globe className="w-3 h-3" />
+        {uni.city}, {uni.country}
+      </p>
+    </div>
 
-                            <button
-                              onClick={() => addToShortlist(uni)}
-                              className="w-full btn-secondary text-sm flex items-center justify-center gap-2"
-                            >
-                              <Plus className="w-4 h-4" />
-                              Add to Shortlist
-                            </button>
-                          </motion.div>
+    {uni.ranking && (
+      <span className="px-2 py-1 bg-dark-800 rounded text-xs">
+        #{uni.ranking}
+      </span>
+    )}
+  </div>
+
+  {/* Fit reason */}
+  <p className="text-sm text-dark-400 mb-3">{uni.fitReason}</p>
+
+  {/* Meta info */}
+  <div className="flex flex-wrap gap-2 mb-3">
+    {uni.tuitionMin && uni.tuitionMax && (
+      <span className="px-2 py-1 bg-dark-800 rounded text-xs flex items-center gap-1">
+        <DollarSign className="w-3 h-3" />
+        ${uni.tuitionMin.toLocaleString()}–${uni.tuitionMax.toLocaleString()}
+      </span>
+    )}
+
+    {uni.acceptanceChance && (
+      <span
+        className={`px-2 py-1 rounded text-xs ${
+          uni.acceptanceChance === 'high'
+            ? 'bg-accent-500/20 text-accent-400'
+            : uni.acceptanceChance === 'medium'
+            ? 'bg-amber-500/20 text-amber-400'
+            : 'bg-red-500/20 text-red-400'
+        }`}
+      >
+        {uni.acceptanceChance} chance
+      </span>
+    )}
+  </div>
+
+  {/* Risks */}
+  {uni.risks && (
+    <p className="text-xs text-red-400 mb-3">
+      ⚠️ {uni.risks}
+    </p>
+  )}
+
+  {/* Action */}
+  <button
+    onClick={() => addToShortlist(uni)}
+    className="w-full btn-secondary text-sm flex items-center justify-center gap-2"
+  >
+    <Plus className="w-4 h-4" />
+    Add to Shortlist
+  </button>
+</motion.div>
+
                         ))}
                     </div>
                   ))}
