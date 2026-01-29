@@ -366,6 +366,46 @@ const lockUniversity = async (req, res) => {
       include: { university: true },
     });
 
+        // 🧠 AUTO-GENERATE TASKS FOR LOCKED UNIVERSITY
+    const existingTasks = await prisma.task.count({
+      where: {
+        userId: req.user.id,
+        universityId: updated.university.id,
+      },
+    });
+
+    if (existingTasks === 0) {
+      await prisma.task.createMany({
+        data: [
+          {
+            userId: req.user.id,
+            title: `Research ${updated.university.name}`,
+            category: 'university',
+            priority: 'high',
+            universityId: updated.university.id,
+            isAiGenerated: true,
+          },
+          {
+            userId: req.user.id,
+            title: `Prepare documents for ${updated.university.name}`,
+            category: 'application',
+            priority: 'medium',
+            universityId: updated.university.id,
+            isAiGenerated: true,
+          },
+          {
+            userId: req.user.id,
+            title: `Track deadlines for ${updated.university.name}`,
+            category: 'deadline',
+            priority: 'high',
+            universityId: updated.university.id,
+            isAiGenerated: true,
+          },
+        ],
+      });
+    }
+
+
     // Check if user has at least one locked university to advance stage
     const lockedCount = await prisma.shortlistedUniversity.count({
       where: { userId: req.user.id, isLocked: true },
