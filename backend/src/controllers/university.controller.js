@@ -229,7 +229,7 @@ const getShortlist = async (req, res) => {
 // @route   POST /api/universities/shortlist
 const addToShortlist = async (req, res) => {
   try {
-    const { universityId, universityName, category, fitReason, risks, acceptanceChance } = req.body;
+    const { universityId, universityName, universityCountry, universityCity, category, fitReason, risks, acceptanceChance } = req.body;
 
     let university;
 
@@ -247,7 +247,8 @@ const addToShortlist = async (req, res) => {
         university = await prisma.university.create({
           data: {
             name: universityName,
-            country: 'TBD',
+            country: universityCountry || 'USA',
+            city: universityCity || null,
             programs: [],
           },
         });

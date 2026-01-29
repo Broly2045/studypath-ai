@@ -67,11 +67,10 @@ const Universities = () => {
 
   const addToShortlist = async (uni) => {
     try {
-      const res = await universityAPI.getAll({ search: uni.name });
-      const universityId = res.data.data.universities[0]?.id;
-
       await universityAPI.addToShortlist({
-        universityId,
+        universityName: uni.name,
+        universityCountry: uni.country,
+        universityCity: uni.city,
         category: uni.category,
         fitReason: uni.fitReason,
         risks: uni.risks,
