@@ -30,9 +30,7 @@ const Universities = () => {
   const [loading, setLoading] = useState(true);
   const [loadingRecs, setLoadingRecs] = useState(false);
 
-  /* ----------------------------------
-     Fetch All Data
-  -----------------------------------*/
+  /* ---------------- FETCH DATA ---------------- */
   const fetchData = async () => {
     try {
       const [recsRes, shortlistRes] = await Promise.all([
@@ -53,15 +51,13 @@ const Universities = () => {
     fetchData();
   }, []);
 
-  /* ----------------------------------
-     Actions
-  -----------------------------------*/
+  /* ---------------- ACTIONS ---------------- */
   const refreshRecommendations = async () => {
     setLoadingRecs(true);
     try {
       const res = await universityAPI.getRecommendations();
       setRecommendations(res.data.data.recommendations || []);
-      toast.success('Recommendations updated!');
+      toast.success('Recommendations updated');
     } catch {
       toast.error('Failed to refresh recommendations');
     } finally {
@@ -94,7 +90,7 @@ const Universities = () => {
       await universityAPI.lock(id);
       toast.success('University locked');
 
-      // ⭐ CRITICAL: sync backend stage → frontend
+      // ⭐ CRITICAL FIX
       await refreshUser();
 
       fetchData();
@@ -123,9 +119,7 @@ const Universities = () => {
     }
   };
 
-  /* ----------------------------------
-     Loading State
-  -----------------------------------*/
+  /* ---------------- LOADING ---------------- */
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -134,12 +128,10 @@ const Universities = () => {
     );
   }
 
-  /* ----------------------------------
-     Render
-  -----------------------------------*/
+  /* ---------------- RENDER ---------------- */
   return (
     <div className="min-h-screen">
-      {/* Header */}
+      {/* HEADER */}
       <div className="border-b border-dark-800 px-6 py-4">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -163,7 +155,7 @@ const Universities = () => {
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* TABS */}
       <div className="border-b border-dark-800 px-6">
         <div className="max-w-6xl mx-auto flex gap-4">
           {[
@@ -186,9 +178,59 @@ const Universities = () => {
         </div>
       </div>
 
-      {/* Content */}
+      {/* CONTENT */}
       <div className="px-6 py-8">
         <div className="max-w-6xl mx-auto">
+          {/* AI RECOMMENDATIONS */}
+          {activeTab === 'recommendations' && (
+            <>
+              <div className="mb-6">
+                <h2 className="text-lg font-semibold mb-2">Personalized Recommendations</h2>
+                <p className="text-dark-400 text-sm">Based on your profile</p>
+              </div>
+
+              {recommendations.length > 0 ? (
+                <div className="grid md:grid-cols-3 gap-6">
+                  {['dream', 'target', 'safe'].map((category) => (
+                    <div key={category}>
+                      <h3 className="font-semibold capitalize mb-3">{category}</h3>
+
+                      {recommendations
+                        .filter((r) => r.category === category)
+                        .map((uni, i) => (
+                          <motion.div
+                            key={uni.name}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: i * 0.05 }}
+                            className="glass-card p-5 mb-4"
+                          >
+                            <h4 className="font-semibold mb-1">{uni.name}</h4>
+                            <p className="text-sm text-dark-400 mb-2">
+                              <Globe className="inline w-3 h-3 mr-1" />
+                              {uni.city}, {uni.country}
+                            </p>
+                            <p className="text-sm text-dark-400 mb-3">{uni.fitReason}</p>
+
+                            <button
+                              onClick={() => addToShortlist(uni)}
+                              className="w-full btn-secondary text-sm flex items-center justify-center gap-2"
+                            >
+                              <Plus className="w-4 h-4" />
+                              Add to Shortlist
+                            </button>
+                          </motion.div>
+                        ))}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-dark-400">No recommendations yet</p>
+              )}
+            </>
+          )}
+
+          {/* SHORTLIST */}
           {activeTab === 'shortlist' && (
             <>
               <h2 className="text-lg font-semibold mb-2">Your Shortlist</h2>
