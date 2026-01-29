@@ -379,6 +379,7 @@ const lockUniversity = async (req, res) => {
       },
     });
 
+    let tasksCreated = 0;
     if (existingTasks === 0) {
       await prisma.task.createMany({
         data: [
@@ -408,8 +409,8 @@ const lockUniversity = async (req, res) => {
           },
         ],
       });
+      tasksCreated = 3;
     }
-
 
     // Check if user has at least one locked university to advance stage
     const lockedCount = await prisma.shortlistedUniversity.count({
@@ -426,8 +427,10 @@ const lockUniversity = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'University locked successfully.',
-      data: { shortlisted: updated, lockedCount },
+      message: tasksCreated > 0 
+        ? `University locked! ${tasksCreated} tasks created.`
+        : 'University locked successfully.',
+      data: { shortlisted: updated, lockedCount, tasksCreated },
     });
   } catch (error) {
     console.error('Lock university error:', error);

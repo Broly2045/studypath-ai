@@ -118,8 +118,15 @@ const Universities = () => {
 
   const lockUniversity = async (id) => {
     try {
-      await universityAPI.lock(id);
-      toast.success('University locked');
+      const res = await universityAPI.lock(id);
+      const { tasksCreated } = res.data.data;
+      
+      if (tasksCreated > 0) {
+        toast.success(`University locked! ${tasksCreated} tasks created.`);
+      } else {
+        toast.success('University locked');
+      }
+      
       await refreshUser();
       fetchData();
     } catch {

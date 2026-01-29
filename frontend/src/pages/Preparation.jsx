@@ -17,15 +17,23 @@ const Preparation = () => {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [checkedDocs, setCheckedDocs] = useState({});
 
   const documents = [
-    { name: 'Statement of Purpose (SOP)', required: true },
-    { name: 'Letters of Recommendation', required: true },
-    { name: 'Academic Transcripts', required: true },
-    { name: 'Resume / CV', required: true },
-    { name: 'Passport', required: true },
-    { name: 'Exam Scores (GRE/IELTS/TOEFL)', required: false },
+    { id: 'sop', name: 'Statement of Purpose (SOP)', required: true },
+    { id: 'lor', name: 'Letters of Recommendation', required: true },
+    { id: 'transcripts', name: 'Academic Transcripts', required: true },
+    { id: 'resume', name: 'Resume / CV', required: true },
+    { id: 'passport', name: 'Passport', required: true },
+    { id: 'exams', name: 'Exam Scores (GRE/IELTS/TOEFL)', required: false },
   ];
+
+  const toggleDocument = (docId) => {
+    setCheckedDocs((prev) => ({
+      ...prev,
+      [docId]: !prev[docId],
+    }));
+  };
 
   const timeline = [
     { month: 'Month 1', tasks: 'SOP + Resume', status: 'current' },
@@ -114,15 +122,33 @@ const Preparation = () => {
               </div>
 
               <div className="space-y-3">
-                {documents.map((doc, i) => (
+                {documents.map((doc) => (
                   <div
-                    key={i}
-                    className="flex items-center gap-3 p-3 bg-dark-800/50 rounded-lg"
+                    key={doc.id}
+                    onClick={() => toggleDocument(doc.id)}
+                    className="flex items-center gap-3 p-3 bg-dark-800/50 rounded-lg hover:bg-dark-800 transition-colors cursor-pointer group"
                   >
-                    <Circle className="w-4 h-4 text-dark-500" />
-                    <span className="text-sm flex-1">{doc.name}</span>
-                    {doc.required && (
+                    <div
+                      className={`p-1 rounded transition-colors ${
+                        checkedDocs[doc.id]
+                          ? 'bg-accent-500/20 text-accent-400'
+                          : 'bg-dark-700 text-dark-400 group-hover:bg-dark-600'
+                      }`}
+                    >
+                      {checkedDocs[doc.id] ? (
+                        <CheckCircle className="w-4 h-4" />
+                      ) : (
+                        <Circle className="w-4 h-4" />
+                      )}
+                    </div>
+                    <span className={`text-sm flex-1 ${checkedDocs[doc.id] ? 'text-dark-400 line-through' : ''}`}>
+                      {doc.name}
+                    </span>
+                    {doc.required && !checkedDocs[doc.id] && (
                       <span className="text-xs text-red-400">Required</span>
+                    )}
+                    {checkedDocs[doc.id] && (
+                      <span className="text-xs text-accent-400">Ready</span>
                     )}
                   </div>
                 ))}
