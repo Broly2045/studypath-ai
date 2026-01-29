@@ -193,10 +193,64 @@ const deleteTask = async (req, res) => {
   }
 };
 
+
+const refreshTasksFromProfile = async (userId) => {
+  const profile = await prisma.profile.findUnique({
+    where: { userId },
+  });
+
+  if (!profile) return;
+
+  /* -----------------------------------------
+     1️⃣ Auto-complete exam tasks if exam done
+  ------------------------------------------ */
+  if (profile.ieltsStatus === 'completed') {
+    await prisma.task.updateMany({
+      where: {
+        userId,
+        category: 'exam',
+        isAiGenerated: true,
+        isCompleted: false,
+      },
+      data: {
+        isCompleted: true,
+        completedAt: new Date(),
+      },
+    });
+  }
+
+  /* -----------------------------------------
+     2️⃣ Create exam task only if still needed
+  ------------------------------------------ */
+  const hasExamTask = await prisma.task.findFirst({
+    where: {
+      userId,
+      category: 'exam',
+      isAiGenerated: true,
+      isCompleted: false,
+    },
+  });
+
+  if (!hasExamTask && profile.ieltsStatus !== 'completed') {
+    await prisma.task.create({
+      data: {
+        userId,
+        title: 'Plan and complete required exams',
+        category: 'exam',
+        priority: 'high',
+        isAiGenerated: true,
+      },
+    });
+  }
+};
+
+
+
 module.exports = {
   getTasks,
   createTask,
   updateTask,
   toggleTask,
   deleteTask,
+  refreshTasksFromProfile,
 };

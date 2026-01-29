@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { profileAPI } from '../services/api';
 import toast from 'react-hot-toast';
 
+
 const COUNTRIES = [
   { code: 'USA', name: 'United States', flag: '🇺🇸' },
   { code: 'UK', name: 'United Kingdom', flag: '🇬🇧' },
@@ -18,7 +19,7 @@ const COUNTRIES = [
 ];
 
 const Profile = () => {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -40,7 +41,8 @@ const Profile = () => {
     setSaving(true);
     try {
       await profileAPI.update(profile);
-      toast.success('Profile saved!');
+      await refreshUser();
+      toast.success('Profile saved and recommendations updated!');
     } catch (error) {
       toast.error('Error saving profile');
     } finally {

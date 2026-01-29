@@ -1,4 +1,7 @@
 const prisma = require('../config/database');
+const { refreshRecommendationsAndAcceptance } = require('./university.controller');
+const { refreshTasksFromProfile } = require('./task.controller');
+
 
 // Helper function to parse float (returns null if empty/invalid)
 const parseFloatOrNull = (value) => {
@@ -133,6 +136,13 @@ const updateProfile = async (req, res) => {
         overallStrength: strength.overall,
       },
     });
+
+    // 🔁 Trigger downstream updates after profile edit
+await Promise.all([
+  refreshRecommendationsAndAcceptance(req.user.id),
+  refreshTasksFromProfile(req.user.id),
+]);
+
 
     res.json({
       success: true,

@@ -51,6 +51,15 @@ const getRecommendations = async (req, res) => {
       include: { profile: true },
     });
 
+    // ⛔ Skip AI if recommendations are not stale
+if (!user.recommendationsStale) {
+  return res.json({
+    success: true,
+    data: { recommendations: [] },
+  });
+}
+
+
     if (!user.profile) {
       return res.status(400).json({
         success: false,
@@ -125,10 +134,17 @@ Provide exactly 3 universities per category (9 total). Use REAL universities tha
       recommendations = getDefaultRecommendations(profile);
     }
 
-    res.json({
-      success: true,
-      data: { recommendations },
-    });
+    // ✅ Mark recommendations as fresh again
+await prisma.user.update({
+  where: { id: req.user.id },
+  data: { recommendationsStale: false },
+});
+
+res.json({
+  success: true,
+  data: { recommendations },
+});
+
   } catch (error) {
     console.error('Get recommendations error:', error);
     res.status(500).json({
@@ -470,6 +486,31 @@ const unlockUniversity = async (req, res) => {
   }
 };
 
+const refreshRecommendationsAndAcceptance = async (userId) => {
+  // 1️⃣ Mark recommendations as stale (lazy regeneration)
+  await prisma.user.update({
+    where: { id: userId },
+    data: { recommendationsStale: true },
+  });
+
+  // 2️⃣ Recalculate acceptance chances for shortlisted universities
+  const shortlist = await prisma.shortlistedUniversity.findMany({
+    where: { userId },
+  });
+
+  for (const uni of shortlist) {
+    const chance =
+      uni.category === 'dream' ? 'low' :
+      uni.category === 'target' ? 'medium' : 'high';
+
+    await prisma.shortlistedUniversity.update({
+      where: { id: uni.id },
+      data: { acceptanceChance: chance },
+    });
+  }
+};
+
+
 module.exports = {
   getUniversities,
   getRecommendations,
@@ -478,4 +519,5 @@ module.exports = {
   removeFromShortlist,
   lockUniversity,
   unlockUniversity,
+  refreshRecommendationsAndAcceptance,
 };
