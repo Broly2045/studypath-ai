@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { taskAPI } from '../services/api';
 import {
@@ -7,24 +7,16 @@ import {
   Calendar,
   CheckCircle,
   Circle,
-  GraduationCap,
-  Clock,
+  RefreshCw,
+  Loader2,
   AlertCircle,
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 const Preparation = () => {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    taskAPI
-      .getAll({ category: 'application' })
-      .then((res) => {
-        setTasks(res.data.data.tasks || []);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+  const [refreshing, setRefreshing] = useState(false);
 
   const documents = [
     { name: 'Statement of Purpose (SOP)', required: true },
@@ -41,18 +33,70 @@ const Preparation = () => {
     { month: 'Month 3', tasks: 'Forms + Applications', status: 'upcoming' },
   ];
 
+  const fetchTasks = useCallback(async (showRefreshing = false) => {
+    if (showRefreshing) setRefreshing(true);
+    try {
+      const res = await taskAPI.getAll();
+      // Filter for application-related tasks
+      const allTasks = res.data.data.tasks || [];
+      const applicationTasks = allTasks.filter(
+        (t) => t.category === 'application' || t.category === 'university' || t.category === 'deadline'
+      );
+      setTasks(applicationTasks);
+    } catch {
+      toast.error('Error loading tasks');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchTasks();
+  }, [fetchTasks]);
+
+  const handleRefresh = () => {
+    fetchTasks(true);
+  };
+
+  const toggleTaskComplete = async (taskId, currentStatus) => {
+    try {
+      await taskAPI.update(taskId, { isCompleted: !currentStatus });
+      setTasks((prev) =>
+        prev.map((t) => (t.id === taskId ? { ...t, isCompleted: !currentStatus } : t))
+      );
+      toast.success(currentStatus ? 'Task marked incomplete' : 'Task completed!');
+    } catch {
+      toast.error('Error updating task');
+    }
+  };
+
+  const completedCount = tasks.filter((t) => t.isCompleted).length;
+  const progressPercent = tasks.length > 0 ? Math.round((completedCount / tasks.length) * 100) : 0;
+
   return (
     <div className="min-h-screen">
       {/* Header */}
       <div className="border-b border-dark-800 px-6 py-4">
-        <div className="max-w-4xl mx-auto flex items-center gap-4">
-          <Link to="/dashboard" className="p-2 hover:bg-dark-800 rounded-lg transition-colors">
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
-          <div>
-            <h1 className="text-xl font-bold">Preparation Stage</h1>
-            <p className="text-sm text-dark-400">Get your documents ready for applications</p>
+        <div className="max-w-4xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Link to="/dashboard" className="p-2 hover:bg-dark-800 rounded-lg transition-colors">
+              <ArrowLeft className="w-5 h-5" />
+            </Link>
+            <div>
+              <h1 className="text-xl font-bold">Preparation Stage</h1>
+              <p className="text-sm text-dark-400">Get your documents ready for applications</p>
+            </div>
           </div>
+
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="btn-secondary flex items-center gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
         </div>
       </div>
 
@@ -131,20 +175,41 @@ const Preparation = () => {
               </span>
             </div>
 
+            {/* Progress Bar */}
+            {tasks.length > 0 && (
+              <div className="mb-4">
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-dark-400">Progress</span>
+                  <span className="text-dark-400">
+                    {completedCount}/{tasks.length} completed
+                  </span>
+                </div>
+                <div className="h-2 bg-dark-800 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-accent-500 transition-all duration-300"
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
             {loading ? (
-              <div className="text-center py-8 text-dark-400">Loading tasks...</div>
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-8 h-8 text-primary-500 animate-spin" />
+              </div>
             ) : tasks.length > 0 ? (
               <div className="space-y-3">
                 {tasks.map((task) => (
                   <div
                     key={task.id}
-                    className="flex items-center gap-3 p-4 bg-dark-800/50 rounded-lg hover:bg-dark-800 transition-colors"
+                    onClick={() => toggleTaskComplete(task.id, task.isCompleted)}
+                    className="flex items-center gap-3 p-4 bg-dark-800/50 rounded-lg hover:bg-dark-800 transition-colors cursor-pointer group"
                   >
                     <div
-                      className={`p-1 rounded ${
+                      className={`p-1 rounded transition-colors ${
                         task.isCompleted
                           ? 'bg-accent-500/20 text-accent-400'
-                          : 'bg-dark-700 text-dark-400'
+                          : 'bg-dark-700 text-dark-400 group-hover:bg-dark-600'
                       }`}
                     >
                       {task.isCompleted ? (
@@ -160,9 +225,14 @@ const Preparation = () => {
                     >
                       {task.title}
                     </span>
-                    {task.priority === 'high' && (
+                    {task.priority === 'high' && !task.isCompleted && (
                       <span className="px-2 py-1 bg-red-500/20 text-red-400 text-xs rounded">
                         High
+                      </span>
+                    )}
+                    {task.category && (
+                      <span className="px-2 py-1 bg-dark-700 text-dark-400 text-xs rounded capitalize">
+                        {task.category}
                       </span>
                     )}
                   </div>
