@@ -475,21 +475,17 @@ const unlockUniversity = async (req, res) => {
 };
 
 const refreshRecommendationsAndAcceptance = async (userId) => {
-  // 1️⃣ Mark recommendations as stale (lazy regeneration)
-  await prisma.user.update({
-    where: { id: userId },
-    data: { recommendationsStale: true },
-  });
-
-  // 2️⃣ Recalculate acceptance chances for shortlisted universities
   const shortlist = await prisma.shortlistedUniversity.findMany({
     where: { userId },
   });
 
   for (const uni of shortlist) {
     const chance =
-      uni.category === 'dream' ? 'low' :
-      uni.category === 'target' ? 'medium' : 'high';
+      uni.category === 'dream'
+        ? 'low'
+        : uni.category === 'target'
+        ? 'medium'
+        : 'high';
 
     await prisma.shortlistedUniversity.update({
       where: { id: uni.id },
@@ -497,6 +493,7 @@ const refreshRecommendationsAndAcceptance = async (userId) => {
     });
   }
 };
+
 
 
 module.exports = {

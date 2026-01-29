@@ -137,11 +137,13 @@ const updateProfile = async (req, res) => {
       },
     });
 
-    // 🔁 Trigger downstream updates after profile edit
-await Promise.all([
+   Promise.all([
   refreshRecommendationsAndAcceptance(req.user.id),
   refreshTasksFromProfile(req.user.id),
-]);
+]).catch((err) => {
+  console.error('Post-profile update error:', err);
+});
+
 
 
     res.json({
