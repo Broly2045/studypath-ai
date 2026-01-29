@@ -51,13 +51,6 @@ const getRecommendations = async (req, res) => {
       include: { profile: true },
     });
 
-    // ⛔ Skip AI if recommendations are not stale
-if (!user.recommendationsStale) {
-  return res.json({
-    success: true,
-    data: { recommendations: [] },
-  });
-}
 
 
     if (!user.profile) {
@@ -134,11 +127,6 @@ Provide exactly 3 universities per category (9 total). Use REAL universities tha
       recommendations = getDefaultRecommendations(profile);
     }
 
-    // ✅ Mark recommendations as fresh again
-await prisma.user.update({
-  where: { id: req.user.id },
-  data: { recommendationsStale: false },
-});
 
 res.json({
   success: true,
