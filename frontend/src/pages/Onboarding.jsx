@@ -44,7 +44,7 @@ const COUNTRIES = [
 
 const Onboarding = () => {
   const navigate = useNavigate();
-  const { user, updateUser, logout } = useAuth();
+  const { user, refreshUser, logout } = useAuth();
   const [mode, setMode] = useState(null);
   const [currentSection, setCurrentSection] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -258,19 +258,23 @@ const Onboarding = () => {
   };
 
   const handleComplete = async () => {
-    setLoading(true);
-    try {
-      await profileAPI.update(formData);
-      await profileAPI.completeOnboarding();
-      updateUser({ onboardingCompleted: true, currentStage: 2 });
-      toast.success('Profile complete! Let\'s find your perfect universities.');
-      navigate('/dashboard');
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Error completing onboarding');
-    } finally {
-      setLoading(false);
-    }
-  };
+  setLoading(true);
+  try {
+    await profileAPI.update(formData);
+    await profileAPI.completeOnboarding();
+
+    // ✅ IMPORTANT: re-sync user from backend
+    await refreshUser();
+
+    toast.success("Profile complete! Let's find your perfect universities.");
+    navigate('/dashboard', { replace: true });
+  } catch (error) {
+    toast.error(error.response?.data?.message || 'Error completing onboarding');
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   const handleAIChat = async (e) => {
     e.preventDefault();
