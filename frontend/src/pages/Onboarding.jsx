@@ -15,7 +15,6 @@ import {
   Loader2,
   Mic,
   MicOff,
-  X,
   Volume2,
   VolumeX,
   LogOut
@@ -42,12 +41,40 @@ const COUNTRIES = [
   { code: 'SGP', name: 'Singapore', flag: '🇸🇬' },
 ];
 
+// Default form values
+const DEFAULT_FORM_DATA = {
+  educationLevel: '',
+  currentDegree: '',
+  major: '',
+  graduationYear: new Date().getFullYear(),
+  gpa: '',
+  gpaScale: '10',
+  intendedDegree: '',
+  fieldOfStudy: '',
+  targetIntakeYear: new Date().getFullYear() + 1,
+  targetIntakeSeason: 'fall',
+  preferredCountries: [],
+  budgetMin: '',
+  budgetMax: '',
+  fundingPlan: '',
+  ieltsStatus: 'not_started',
+  ieltsScore: '',
+  toeflStatus: 'not_started',
+  toeflScore: '',
+  greStatus: 'not_started',
+  greScore: '',
+  gmatStatus: 'not_started',
+  gmatScore: '',
+  sopStatus: 'not_started',
+};
+
 const Onboarding = () => {
   const navigate = useNavigate();
   const { user, refreshUser, logout } = useAuth();
   const [mode, setMode] = useState(null);
   const [currentSection, setCurrentSection] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [profileLoaded, setProfileLoaded] = useState(false);
   
   // Refs for auto-scroll and voice
   const messagesEndRef = useRef(null);
@@ -63,36 +90,58 @@ const Onboarding = () => {
   const [ttsEnabled, setTtsEnabled] = useState(true);
   const speechSynthRef = useRef(null);
   
-  const [formData, setFormData] = useState({
-    educationLevel: '',
-    currentDegree: '',
-    major: '',
-    graduationYear: new Date().getFullYear(),
-    gpa: '',
-    gpaScale: '10',
-    intendedDegree: '',
-    fieldOfStudy: '',
-    targetIntakeYear: new Date().getFullYear() + 1,
-    targetIntakeSeason: 'fall',
-    preferredCountries: [],
-    budgetMin: '',
-    budgetMax: '',
-    fundingPlan: '',
-    ieltsStatus: 'not_started',
-    ieltsScore: '',
-    toeflStatus: 'not_started',
-    toeflScore: '',
-    greStatus: 'not_started',
-    greScore: '',
-    gmatStatus: 'not_started',
-    gmatScore: '',
-    sopStatus: 'not_started',
-  });
+  const [formData, setFormData] = useState(DEFAULT_FORM_DATA);
 
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
   const [aiSection, setAiSection] = useState('academic');
+
+  // Load existing profile data on mount
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const response = await profileAPI.get();
+        const profile = response.data.data.profile;
+        
+        if (profile) {
+          // Merge existing profile data with defaults
+          setFormData(prev => ({
+            ...prev,
+            educationLevel: profile.educationLevel || '',
+            currentDegree: profile.currentDegree || '',
+            major: profile.major || '',
+            graduationYear: profile.graduationYear || new Date().getFullYear(),
+            gpa: profile.gpa || '',
+            gpaScale: profile.gpaScale?.toString() || '10',
+            intendedDegree: profile.intendedDegree || '',
+            fieldOfStudy: profile.fieldOfStudy || '',
+            targetIntakeYear: profile.targetIntakeYear || new Date().getFullYear() + 1,
+            targetIntakeSeason: profile.targetIntakeSeason || 'fall',
+            preferredCountries: profile.preferredCountries || [],
+            budgetMin: profile.budgetMin || '',
+            budgetMax: profile.budgetMax || '',
+            fundingPlan: profile.fundingPlan || '',
+            ieltsStatus: profile.ieltsStatus || 'not_started',
+            ieltsScore: profile.ieltsScore || '',
+            toeflStatus: profile.toeflStatus || 'not_started',
+            toeflScore: profile.toeflScore || '',
+            greStatus: profile.greStatus || 'not_started',
+            greScore: profile.greScore || '',
+            gmatStatus: profile.gmatStatus || 'not_started',
+            gmatScore: profile.gmatScore || '',
+            sopStatus: profile.sopStatus || 'not_started',
+          }));
+        }
+        setProfileLoaded(true);
+      } catch (error) {
+        console.error('Error loading profile:', error);
+        setProfileLoaded(true);
+      }
+    };
+
+    loadProfile();
+  }, []);
 
   // Initialize speech recognition
   useEffect(() => {
@@ -160,15 +209,15 @@ const Onboarding = () => {
     const voices = speechSynthRef.current.getVoices();
     const preferredVoice = voices.find(voice => 
       voice.lang.includes('en') && (
-        voice.name.includes('Samantha') ||  // macOS female
+        voice.name.includes('Samantha') ||
         voice.name.includes('Google UK English Female') ||
         voice.name.includes('Google US English') ||
-        voice.name.includes('Microsoft Zira') ||  // Windows female
-        voice.name.includes('Microsoft Jenny') || // Windows 11 female
+        voice.name.includes('Microsoft Zira') ||
+        voice.name.includes('Microsoft Jenny') ||
         voice.name.includes('Female') ||
-        voice.name.includes('Fiona') ||  // macOS
-        voice.name.includes('Karen') ||  // macOS Australian
-        voice.name.includes('Moira')     // macOS Irish
+        voice.name.includes('Fiona') ||
+        voice.name.includes('Karen') ||
+        voice.name.includes('Moira')
       )
     ) || voices.find(voice => 
       voice.lang.includes('en') && voice.name.toLowerCase().includes('female')
@@ -235,6 +284,7 @@ const Onboarding = () => {
     }));
   };
 
+  // Form mode: save and advance
   const handleNext = async () => {
     if (currentSection < SECTIONS.length - 1) {
       try {
@@ -244,7 +294,7 @@ const Onboarding = () => {
       }
       setCurrentSection((prev) => prev + 1);
     } else {
-      await handleComplete();
+      await handleFormComplete();
     }
   };
 
@@ -252,29 +302,58 @@ const Onboarding = () => {
     if (currentSection > 0) {
       setCurrentSection((prev) => prev - 1);
     } else {
-      // If on first section, go back to mode selection
       goBackToModeSelection();
     }
   };
 
-  const handleComplete = async () => {
-  setLoading(true);
-  try {
-    await profileAPI.update(formData);
-    await profileAPI.completeOnboarding();
+  // FORM MODE completion - saves formData then completes
+  const handleFormComplete = async () => {
+    setLoading(true);
+    try {
+      // Save form data first
+      await profileAPI.update(formData);
+      // Then complete onboarding
+      await profileAPI.completeOnboarding();
+      // Re-sync user from backend
+      await refreshUser();
 
-    // ✅ IMPORTANT: re-sync user from backend
-    await refreshUser();
+      toast.success("Profile complete! Let's find your perfect universities.");
+      navigate('/dashboard', { replace: true });
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Error completing onboarding');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    toast.success("Profile complete! Let's find your perfect universities.");
-    navigate('/dashboard', { replace: true });
-  } catch (error) {
-    toast.error(error.response?.data?.message || 'Error completing onboarding');
-  } finally {
-    setLoading(false);
-  }
-};
+  // AI MODE completion - just completes (data already saved by AI)
+  const handleAIComplete = async () => {
+    setLoading(true);
+    try {
+      // DON'T save formData - AI has already updated the profile directly
+      // Just call completeOnboarding
+      await profileAPI.completeOnboarding();
+      // Re-sync user from backend
+      await refreshUser();
 
+      toast.success("Profile complete! Let's find your perfect universities.");
+      navigate('/dashboard', { replace: true });
+    } catch (error) {
+      // If completion fails due to missing fields, show what's missing
+      const missingFields = error.response?.data?.missingFields;
+      if (missingFields && missingFields.length > 0) {
+        toast.error(`Please provide: ${missingFields.join(', ')}`);
+        // Add a message to the chat asking for missing info
+        const missingMessage = `I noticed we're still missing some information: ${missingFields.join(', ')}. Could you help me fill those in?`;
+        setChatMessages(prev => [...prev, { role: 'assistant', content: missingMessage }]);
+        speakText(missingMessage);
+      } else {
+        toast.error(error.response?.data?.message || 'Error completing onboarding');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleAIChat = async (e) => {
     e.preventDefault();
@@ -300,9 +379,9 @@ const Onboarding = () => {
       // Speak the AI response
       speakText(aiResponse);
 
-      // If all sections are complete, finish onboarding
+      // If all sections are complete, finish onboarding using AI completion handler
       if (allComplete) {
-        setTimeout(() => handleComplete(), 1500);
+        setTimeout(() => handleAIComplete(), 1500);
         return;
       }
 
@@ -311,7 +390,8 @@ const Onboarding = () => {
         if (sectionIndex < SECTIONS.length - 1) {
           setAiSection(SECTIONS[sectionIndex + 1].id);
         } else {
-          setTimeout(() => handleComplete(), 1500);
+          // Last section complete, use AI completion handler
+          setTimeout(() => handleAIComplete(), 1500);
         }
       }
     } catch (error) {
@@ -345,6 +425,15 @@ const Onboarding = () => {
     setAiSection('academic');
     setCurrentSection(0);
   };
+
+  // Show loading while profile loads
+  if (!profileLoaded) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
+      </div>
+    );
+  }
 
   if (!mode) {
     return (
