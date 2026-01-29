@@ -8,10 +8,15 @@ import {
   Lock,
   Unlock,
   Plus,
-  Globe,
   DollarSign,
   Loader2,
   RefreshCw,
+  Star,
+  Target,
+  Shield,
+  Trash2,
+  CheckCircle,
+  MapPin,
 } from 'lucide-react';
 import { universityAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -29,6 +34,33 @@ const Universities = () => {
   const [activeTab, setActiveTab] = useState('recommendations');
   const [loading, setLoading] = useState(true);
   const [loadingRecs, setLoadingRecs] = useState(false);
+
+  const categoryConfig = {
+    dream: {
+      icon: Star,
+      color: 'text-purple-400',
+      bg: 'bg-purple-500/20',
+      border: 'border-purple-500/30',
+      label: 'Dream',
+      description: 'Reach schools',
+    },
+    target: {
+      icon: Target,
+      color: 'text-blue-400',
+      bg: 'bg-blue-500/20',
+      border: 'border-blue-500/30',
+      label: 'Target',
+      description: 'Good match',
+    },
+    safe: {
+      icon: Shield,
+      color: 'text-green-400',
+      bg: 'bg-green-500/20',
+      border: 'border-green-500/30',
+      label: 'Safe',
+      description: 'High chance',
+    },
+  };
 
   /* ---------------- FETCH DATA ---------------- */
   const fetchData = async () => {
@@ -88,10 +120,7 @@ const Universities = () => {
     try {
       await universityAPI.lock(id);
       toast.success('University locked');
-
-      // ⭐ CRITICAL FIX
       await refreshUser();
-
       fetchData();
     } catch {
       toast.error('Error locking university');
@@ -118,6 +147,11 @@ const Universities = () => {
     }
   };
 
+  const totalShortlisted = shortlist.dream.length + shortlist.target.length + shortlist.safe.length;
+  const totalLocked = [...shortlist.dream, ...shortlist.target, ...shortlist.safe].filter(
+    (s) => s.isLocked
+  ).length;
+
   /* ---------------- LOADING ---------------- */
   if (loading) {
     return (
@@ -134,12 +168,12 @@ const Universities = () => {
       <div className="border-b border-dark-800 px-6 py-4">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Link to="/dashboard" className="p-2 hover:bg-dark-800 rounded-lg">
+            <Link to="/dashboard" className="p-2 hover:bg-dark-800 rounded-lg transition-colors">
               <ArrowLeft className="w-5 h-5" />
             </Link>
             <div>
               <h1 className="text-xl font-bold">Universities</h1>
-              <p className="text-sm text-dark-500">Discover and shortlist</p>
+              <p className="text-sm text-dark-400">Discover and shortlist</p>
             </div>
           </div>
 
@@ -159,7 +193,7 @@ const Universities = () => {
         <div className="max-w-6xl mx-auto flex gap-4">
           {[
             { id: 'recommendations', label: 'AI Recommendations', icon: Sparkles },
-            { id: 'shortlist', label: 'My Shortlist', icon: University },
+            { id: 'shortlist', label: 'My Shortlist', icon: University, count: totalShortlisted },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -172,6 +206,11 @@ const Universities = () => {
             >
               <tab.icon className="w-4 h-4" />
               {tab.label}
+              {tab.count > 0 && (
+                <span className="px-2 py-0.5 bg-primary-500/20 text-primary-400 text-xs rounded-full">
+                  {tab.count}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -184,93 +223,112 @@ const Universities = () => {
           {activeTab === 'recommendations' && (
             <>
               <div className="mb-6">
-                <h2 className="text-lg font-semibold mb-2">Personalized Recommendations</h2>
+                <h2 className="text-lg font-semibold mb-1">Personalized Recommendations</h2>
                 <p className="text-dark-400 text-sm">Based on your profile</p>
               </div>
 
               {recommendations.length > 0 ? (
                 <div className="grid md:grid-cols-3 gap-6">
-                  {['dream', 'target', 'safe'].map((category) => (
-                    <div key={category}>
-                      <h3 className="font-semibold capitalize mb-3">{category}</h3>
+                  {['dream', 'target', 'safe'].map((category) => {
+                    const config = categoryConfig[category];
+                    const CategoryIcon = config.icon;
+                    const unis = recommendations.filter((r) => r.category === category);
 
-                      {recommendations
-                        .filter((r) => r.category === category)
-                        .map((uni, i) => (
-                          <motion.div
-  key={uni.name}
-  initial={{ opacity: 0, y: 20 }}
-  animate={{ opacity: 1, y: 0 }}
-  transition={{ delay: i * 0.05 }}
-  className="glass-card p-5 mb-4 hover:border-primary-500/40 transition-all"
->
-  {/* Header */}
-  <div className="flex items-start justify-between mb-2">
-    <div>
-      <h4 className="font-semibold">{uni.name}</h4>
-      <p className="text-sm text-dark-400 flex items-center gap-1">
-        <Globe className="w-3 h-3" />
-        {uni.city}, {uni.country}
-      </p>
-    </div>
+                    return (
+                      <div key={category}>
+                        {/* Category Header */}
+                        <div className="flex items-center gap-2 mb-4">
+                          <div className={`p-1.5 rounded-lg ${config.bg}`}>
+                            <CategoryIcon className={`w-4 h-4 ${config.color}`} />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold">{config.label}</h3>
+                            <p className="text-xs text-dark-500">{config.description}</p>
+                          </div>
+                          <span className="ml-auto text-xs text-dark-500">{unis.length}</span>
+                        </div>
 
-    {uni.ranking && (
-      <span className="px-2 py-1 bg-dark-800 rounded text-xs">
-        #{uni.ranking}
-      </span>
-    )}
-  </div>
+                        {/* University Cards */}
+                        <div className="space-y-4">
+                          {unis.map((uni, i) => (
+                            <motion.div
+                              key={uni.name}
+                              initial={{ opacity: 0, y: 20 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: i * 0.05 }}
+                              className={`glass-card p-5 hover:${config.border} transition-all`}
+                            >
+                              {/* Header */}
+                              <div className="flex items-start justify-between mb-2">
+                                <div className="flex-1">
+                                  <h4 className="font-semibold leading-tight">{uni.name}</h4>
+                                  <p className="text-sm text-dark-400 flex items-center gap-1 mt-1">
+                                    <MapPin className="w-3 h-3" />
+                                    {uni.city}, {uni.country}
+                                  </p>
+                                </div>
+                                {uni.ranking && (
+                                  <span className="px-2 py-1 bg-dark-800 rounded text-xs font-medium">
+                                    #{uni.ranking}
+                                  </span>
+                                )}
+                              </div>
 
-  {/* Fit reason */}
-  <p className="text-sm text-dark-400 mb-3">{uni.fitReason}</p>
+                              {/* Fit reason */}
+                              <p className="text-sm text-dark-400 mb-3 line-clamp-2">
+                                {uni.fitReason}
+                              </p>
 
-  {/* Meta info */}
-  <div className="flex flex-wrap gap-2 mb-3">
-    {uni.tuitionMin && uni.tuitionMax && (
-      <span className="px-2 py-1 bg-dark-800 rounded text-xs flex items-center gap-1">
-        <DollarSign className="w-3 h-3" />
-        ${uni.tuitionMin.toLocaleString()}–${uni.tuitionMax.toLocaleString()}
-      </span>
-    )}
+                              {/* Meta info */}
+                              <div className="flex flex-wrap gap-2 mb-3">
+                                {uni.tuitionMin && uni.tuitionMax && (
+                                  <span className="px-2 py-1 bg-dark-800 rounded text-xs flex items-center gap-1">
+                                    <DollarSign className="w-3 h-3" />
+                                    ${uni.tuitionMin.toLocaleString()}–$
+                                    {uni.tuitionMax.toLocaleString()}
+                                  </span>
+                                )}
+                                {uni.acceptanceChance && (
+                                  <span
+                                    className={`px-2 py-1 rounded text-xs ${
+                                      uni.acceptanceChance === 'high'
+                                        ? 'bg-green-500/20 text-green-400'
+                                        : uni.acceptanceChance === 'medium'
+                                        ? 'bg-amber-500/20 text-amber-400'
+                                        : 'bg-red-500/20 text-red-400'
+                                    }`}
+                                  >
+                                    {uni.acceptanceChance} chance
+                                  </span>
+                                )}
+                              </div>
 
-    {uni.acceptanceChance && (
-      <span
-        className={`px-2 py-1 rounded text-xs ${
-          uni.acceptanceChance === 'high'
-            ? 'bg-accent-500/20 text-accent-400'
-            : uni.acceptanceChance === 'medium'
-            ? 'bg-amber-500/20 text-amber-400'
-            : 'bg-red-500/20 text-red-400'
-        }`}
-      >
-        {uni.acceptanceChance} chance
-      </span>
-    )}
-  </div>
+                              {/* Risks */}
+                              {uni.risks && (
+                                <p className="text-xs text-amber-400/80 mb-3">⚠️ {uni.risks}</p>
+                              )}
 
-  {/* Risks */}
-  {uni.risks && (
-    <p className="text-xs text-red-400 mb-3">
-      ⚠️ {uni.risks}
-    </p>
-  )}
-
-  {/* Action */}
-  <button
-    onClick={() => addToShortlist(uni)}
-    className="w-full btn-secondary text-sm flex items-center justify-center gap-2"
-  >
-    <Plus className="w-4 h-4" />
-    Add to Shortlist
-  </button>
-</motion.div>
-
-                        ))}
-                    </div>
-                  ))}
+                              {/* Action */}
+                              <button
+                                onClick={() => addToShortlist(uni)}
+                                className="w-full py-2 px-4 bg-dark-800 hover:bg-dark-700 rounded-lg text-sm flex items-center justify-center gap-2 transition-colors"
+                              >
+                                <Plus className="w-4 h-4" />
+                                Add to Shortlist
+                              </button>
+                            </motion.div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
-                <p className="text-dark-400">No recommendations yet</p>
+                <div className="text-center py-12">
+                  <Sparkles className="w-12 h-12 text-dark-600 mx-auto mb-3" />
+                  <p className="text-dark-400">No recommendations yet</p>
+                  <p className="text-dark-500 text-sm">Complete your profile to get started</p>
+                </div>
               )}
             </>
           )}
@@ -278,64 +336,158 @@ const Universities = () => {
           {/* SHORTLIST */}
           {activeTab === 'shortlist' && (
             <>
-              <h2 className="text-lg font-semibold mb-2">Your Shortlist</h2>
-              <p className="text-dark-400 text-sm mb-6">
-                Lock at least one university to move to the next stage
-              </p>
+              {/* Summary Stats */}
+              <div className="flex items-center gap-6 mb-6">
+                <div>
+                  <h2 className="text-lg font-semibold mb-1">Your Shortlist</h2>
+                  <p className="text-dark-400 text-sm">
+                    Lock at least one university to move to the next stage
+                  </p>
+                </div>
+                {totalShortlisted > 0 && (
+                  <div className="ml-auto flex items-center gap-4">
+                    <div className="text-center">
+                      <p className="text-2xl font-bold">{totalShortlisted}</p>
+                      <p className="text-xs text-dark-500">Shortlisted</p>
+                    </div>
+                    <div className="w-px h-8 bg-dark-700" />
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-accent-400">{totalLocked}</p>
+                      <p className="text-xs text-dark-500">Locked</p>
+                    </div>
+                  </div>
+                )}
+              </div>
 
-              <div className="grid md:grid-cols-3 gap-6">
-                {['dream', 'target', 'safe'].map((category) => (
-                  <div key={category}>
-                    <h3 className="font-semibold capitalize mb-3">{category}</h3>
+              {totalShortlisted === 0 ? (
+                <div className="text-center py-12">
+                  <University className="w-12 h-12 text-dark-600 mx-auto mb-3" />
+                  <p className="text-dark-400">No universities shortlisted yet</p>
+                  <p className="text-dark-500 text-sm mb-4">
+                    Add universities from AI Recommendations
+                  </p>
+                  <button
+                    onClick={() => setActiveTab('recommendations')}
+                    className="btn-primary text-sm"
+                  >
+                    Browse Recommendations
+                  </button>
+                </div>
+              ) : (
+                <div className="grid md:grid-cols-3 gap-6">
+                  {['dream', 'target', 'safe'].map((category) => {
+                    const config = categoryConfig[category];
+                    const CategoryIcon = config.icon;
+                    const items = shortlist[category] || [];
+                    const lockedCount = items.filter((i) => i.isLocked).length;
 
-                    {shortlist[category]?.map((item) => (
-                      <div
-                        key={item.id}
-                        className={`glass-card p-5 mb-4 ${
-                          item.isLocked ? 'border-accent-500/50' : ''
-                        }`}
-                      >
-                        <div className="flex items-center gap-2 mb-2">
-                          {item.isLocked && <Lock className="w-4 h-4 text-accent-400" />}
-                          <h4 className="font-semibold">{item.university?.name}</h4>
+                    return (
+                      <div key={category}>
+                        {/* Category Header */}
+                        <div className="flex items-center gap-2 mb-4">
+                          <div className={`p-1.5 rounded-lg ${config.bg}`}>
+                            <CategoryIcon className={`w-4 h-4 ${config.color}`} />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold">{config.label}</h3>
+                            <p className="text-xs text-dark-500">
+                              {items.length} added · {lockedCount} locked
+                            </p>
+                          </div>
                         </div>
 
-                        <p className="text-sm text-dark-400 mb-3">
-                          {item.university?.country}
-                        </p>
-
-                        <div className="flex gap-2">
-                          {item.isLocked ? (
-                            <button
-                              onClick={() => unlockUniversity(item.id)}
-                              className="flex-1 btn-ghost text-sm"
+                        {/* University Cards */}
+                        <div className="space-y-4">
+                          {items.length === 0 ? (
+                            <div
+                              className={`border border-dashed ${config.border} rounded-xl p-6 text-center`}
                             >
-                              <Unlock className="w-4 h-4 inline mr-1" />
-                              Unlock
-                            </button>
+                              <p className="text-dark-500 text-sm">No {category} schools yet</p>
+                            </div>
                           ) : (
-                            <>
-                              <button
-                                onClick={() => lockUniversity(item.id)}
-                                className="flex-1 btn-primary text-sm"
+                            items.map((item, i) => (
+                              <motion.div
+                                key={item.id}
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: i * 0.05 }}
+                                className={`glass-card p-5 transition-all ${
+                                  item.isLocked
+                                    ? 'border-accent-500/50 bg-accent-500/5'
+                                    : 'hover:border-dark-600'
+                                }`}
                               >
-                                <Lock className="w-4 h-4 inline mr-1" />
-                                Lock
-                              </button>
-                              <button
-                                onClick={() => removeFromShortlist(item.id)}
-                                className="btn-ghost text-sm text-red-400"
-                              >
-                                Remove
-                              </button>
-                            </>
+                                {/* Locked Badge */}
+                                {item.isLocked && (
+                                  <div className="flex items-center gap-1.5 text-accent-400 text-xs font-medium mb-3">
+                                    <CheckCircle className="w-3.5 h-3.5" />
+                                    Locked
+                                  </div>
+                                )}
+
+                                {/* University Info */}
+                                <h4 className="font-semibold mb-1">{item.university?.name}</h4>
+                                <p className="text-sm text-dark-400 flex items-center gap-1 mb-3">
+                                  <MapPin className="w-3 h-3" />
+                                  {item.university?.city && `${item.university.city}, `}
+                                  {item.university?.country}
+                                </p>
+
+                                {/* Acceptance Chance */}
+                                {item.acceptanceChance && (
+                                  <div className="mb-4">
+                                    <span
+                                      className={`px-2 py-1 rounded text-xs ${
+                                        item.acceptanceChance === 'high'
+                                          ? 'bg-green-500/20 text-green-400'
+                                          : item.acceptanceChance === 'medium'
+                                          ? 'bg-amber-500/20 text-amber-400'
+                                          : 'bg-red-500/20 text-red-400'
+                                      }`}
+                                    >
+                                      {item.acceptanceChance} chance
+                                    </span>
+                                  </div>
+                                )}
+
+                                {/* Actions */}
+                                <div className="flex gap-2">
+                                  {item.isLocked ? (
+                                    <button
+                                      onClick={() => unlockUniversity(item.id)}
+                                      className="flex-1 py-2 px-4 bg-dark-800 hover:bg-dark-700 rounded-lg text-sm flex items-center justify-center gap-2 transition-colors"
+                                    >
+                                      <Unlock className="w-4 h-4" />
+                                      Unlock
+                                    </button>
+                                  ) : (
+                                    <>
+                                      <button
+                                        onClick={() => lockUniversity(item.id)}
+                                        className="flex-1 py-2 px-4 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm flex items-center justify-center gap-2 transition-colors"
+                                      >
+                                        <Lock className="w-4 h-4" />
+                                        Lock
+                                      </button>
+                                      <button
+                                        onClick={() => removeFromShortlist(item.id)}
+                                        className="p-2 bg-dark-800 hover:bg-red-500/20 hover:text-red-400 rounded-lg transition-colors"
+                                        title="Remove"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              </motion.div>
+                            ))
                           )}
                         </div>
                       </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </>
           )}
         </div>
