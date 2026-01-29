@@ -38,7 +38,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchDashboard();
-  }, []);
+  }, [user?.currentStage]);
 
   const fetchDashboard = async () => {
     try {

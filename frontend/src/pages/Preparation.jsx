@@ -18,6 +18,7 @@ const Preparation = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [checkedDocs, setCheckedDocs] = useState({});
+  const [completedMonths, setCompletedMonths] = useState({});
 
   const documents = [
     { id: 'sop', name: 'Statement of Purpose (SOP)', required: true },
@@ -36,10 +37,17 @@ const Preparation = () => {
   };
 
   const timeline = [
-    { month: 'Month 1', tasks: 'SOP + Resume', status: 'current' },
-    { month: 'Month 2', tasks: 'Exams + Shortlisting', status: 'upcoming' },
-    { month: 'Month 3', tasks: 'Forms + Applications', status: 'upcoming' },
+    { id: 'month1', month: 'Month 1', tasks: 'SOP + Resume' },
+    { id: 'month2', month: 'Month 2', tasks: 'Exams + Shortlisting' },
+    { id: 'month3', month: 'Month 3', tasks: 'Forms + Applications' },
   ];
+
+  const toggleMonth = (monthId) => {
+    setCompletedMonths((prev) => ({
+      ...prev,
+      [monthId]: !prev[monthId],
+    }));
+  };
 
   const fetchTasks = useCallback(async (showRefreshing = false) => {
     if (showRefreshing) setRefreshing(true);
@@ -164,25 +172,54 @@ const Preparation = () => {
                 <h2 className="text-lg font-semibold">High-Level Timeline</h2>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-2">
                 {timeline.map((item, i) => (
-                  <div key={i} className="flex gap-4">
+                  <div
+                    key={item.id}
+                    onClick={() => toggleMonth(item.id)}
+                    className="flex gap-4 p-3 bg-dark-800/50 rounded-lg hover:bg-dark-800 transition-colors cursor-pointer group"
+                  >
                     <div className="flex flex-col items-center">
                       <div
-                        className={`w-3 h-3 rounded-full ${
-                          item.status === 'current'
+                        className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors ${
+                          completedMonths[item.id]
                             ? 'bg-accent-500'
-                            : 'bg-dark-600'
+                            : 'bg-dark-600 group-hover:bg-dark-500'
                         }`}
-                      />
+                      >
+                        {completedMonths[item.id] && (
+                          <CheckCircle className="w-3 h-3 text-white" />
+                        )}
+                      </div>
                       {i < timeline.length - 1 && (
-                        <div className="w-0.5 h-full bg-dark-700 mt-1" />
+                        <div
+                          className={`w-0.5 flex-1 mt-1 ${
+                            completedMonths[item.id] ? 'bg-accent-500' : 'bg-dark-700'
+                          }`}
+                        />
                       )}
                     </div>
-                    <div className="pb-4">
-                      <p className="font-medium text-sm">{item.month}</p>
-                      <p className="text-dark-400 text-sm">{item.tasks}</p>
+                    <div className="flex-1">
+                      <p
+                        className={`font-medium text-sm ${
+                          completedMonths[item.id] ? 'text-accent-400' : ''
+                        }`}
+                      >
+                        {item.month}
+                      </p>
+                      <p
+                        className={`text-sm ${
+                          completedMonths[item.id]
+                            ? 'text-dark-500 line-through'
+                            : 'text-dark-400'
+                        }`}
+                      >
+                        {item.tasks}
+                      </p>
                     </div>
+                    {completedMonths[item.id] && (
+                      <span className="text-xs text-accent-400 self-center">Done</span>
+                    )}
                   </div>
                 ))}
               </div>
