@@ -12,8 +12,11 @@ import AICounselor from './pages/AICounselor';
 import Universities from './pages/Universities';
 import Tasks from './pages/Tasks';
 import Profile from './pages/Profile';
+import Preparation from './pages/Preparation'; // ✅ STAGE 4
 
-// 🔐 Protected Route
+/* -------------------- ROUTE GUARDS -------------------- */
+
+// 🔐 Protected Route (auth + onboarding)
 const ProtectedRoute = ({ children, requireOnboarding = false }) => {
   const { user, loading } = useAuth();
 
@@ -25,14 +28,39 @@ const ProtectedRoute = ({ children, requireOnboarding = false }) => {
     );
   }
 
-  // ❌ Not logged in
   if (!user) {
     return <Navigate to="/login" replace />;
   }
 
-  // ❌ Logged in but onboarding not complete
   if (requireOnboarding && !user.onboardingCompleted) {
     return <Navigate to="/onboarding" replace />;
+  }
+
+  return children;
+};
+
+// 🧭 Stage-based guard (for Preparation / future stages)
+const StageRoute = ({ minStage, children }) => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen mesh-bg flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (!user.onboardingCompleted) {
+    return <Navigate to="/onboarding" replace />;
+  }
+
+  if (user.currentStage < minStage) {
+    return <Navigate to="/dashboard" replace />;
   }
 
   return children;
@@ -50,7 +78,6 @@ const PublicRoute = ({ children }) => {
     );
   }
 
-  // ✅ Already logged in
   if (user) {
     if (!user.onboardingCompleted) {
       return <Navigate to="/onboarding" replace />;
@@ -60,6 +87,8 @@ const PublicRoute = ({ children }) => {
 
   return children;
 };
+
+/* -------------------- ROUTES -------------------- */
 
 function AppRoutes() {
   return (
@@ -79,7 +108,7 @@ function AppRoutes() {
         }
       />
 
-      {/* Protected */}
+      {/* Core App */}
       <Route
         path="/dashboard"
         element={
@@ -112,6 +141,17 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+
+      {/* ✅ STAGE 4 — PREPARATION (Unlocked after university lock) */}
+      <Route
+        path="/preparation"
+        element={
+          <StageRoute minStage={3}>
+            <Preparation />
+          </StageRoute>
+        }
+      />
+
       <Route
         path="/profile"
         element={
@@ -126,6 +166,8 @@ function AppRoutes() {
     </Routes>
   );
 }
+
+/* -------------------- APP ROOT -------------------- */
 
 function App() {
   return (
