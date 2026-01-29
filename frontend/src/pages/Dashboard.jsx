@@ -188,6 +188,28 @@ const Dashboard = () => {
             </div>
           </motion.div>
 
+          {user?.currentStage >= 3 && (
+  <motion.div
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    className="glass-card p-6 mb-6 border border-accent-500/40"
+  >
+    <h3 className="text-lg font-semibold mb-2">
+      🎯 Preparation Stage Unlocked
+    </h3>
+    <p className="text-dark-400 mb-4">
+      You’ve locked a university. Start preparing SOPs, exams, and application forms.
+    </p>
+    <Link
+      to="/preparation"
+      className="btn-primary inline-flex items-center gap-2"
+    >
+      Go to Preparation
+    </Link>
+  </motion.div>
+)}
+
+
           {/* Stats Grid */}
           <div className="grid md:grid-cols-4 gap-4 mb-6">
             {[
