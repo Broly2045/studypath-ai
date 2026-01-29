@@ -402,44 +402,56 @@ const getOnboardingSystemPrompt = (user, profile, currentSection, collectedData,
   const currentFilled = getFilledFields(currentSection);
   const allSectionsDone = currentSection === 'exams' && currentMissing.length === 0;
 
-  return `You are PathFinder, a friendly AI Study Abroad Counselor. Keep responses SHORT (2-3 sentences max).
+  // Build next question based on what's missing
+  let nextQuestion = '';
+  if (currentMissing.length > 0) {
+    const fieldQuestions = {
+      educationLevel: "What's your current education level? Are you in high school, doing your bachelor's, or already completed it?",
+      major: "What's your major or field of study?",
+      gpa: "What's your GPA or percentage?",
+      intendedDegree: "What degree are you planning to pursue abroad - Bachelor's, Master's, MBA, or PhD?",
+      fieldOfStudy: "What field do you want to study?",
+      preferredCountries: "Which countries are you interested in? (USA, UK, Canada, Australia, Germany, etc.)",
+      budgetMin: "What's your minimum budget per year in USD?",
+      budgetMax: "And what's your maximum budget per year?",
+      fundingPlan: "How do you plan to fund your education - self-funded, scholarship, loan, or mixed?",
+      ieltsStatus: "Have you taken or started preparing for IELTS/TOEFL?",
+      greStatus: "What about GRE/GMAT - have you taken it or planning to?",
+      sopStatus: "How's your Statement of Purpose coming along - not started, draft ready, or finalized?",
+    };
+    nextQuestion = fieldQuestions[currentMissing[0]] || `Tell me about your ${currentMissing[0]}`;
+  }
 
-STUDENT: ${user.fullName}
-SECTION: ${currentSection}
-FILLED: ${currentFilled.join(', ') || 'None'}
-MISSING: ${currentMissing.join(', ') || 'COMPLETE'}
+  return `You are PathFinder, a friendly AI Study Abroad Counselor helping ${user.fullName} with onboarding.
 
-## FIELD VALUES (use these for valid options)
+CURRENT SECTION: ${currentSection}
+FIELDS ALREADY FILLED: ${currentFilled.join(', ') || 'None yet'}
+FIELDS STILL NEEDED: ${currentMissing.join(', ') || 'ALL COMPLETE!'}
+
+VALID VALUES:
 - educationLevel: high_school, bachelors, masters
 - intendedDegree: bachelors, masters, mba, phd
 - fundingPlan: self_funded, scholarship, loan, mixed
-- ieltsStatus/greStatus: not_started, preparing, scheduled, completed, not_required
+- ieltsStatus/greStatus/toeflStatus: not_started, preparing, scheduled, completed, not_required
 - sopStatus: not_started, draft, ready
 - preferredCountries: USA, UK, CAN, AUS, GER, NLD, IRL, SGP
 
-## EXTRACTION RULES - MANDATORY
-When user gives info, ALWAYS include: [ONBOARD_DATA:fieldName|value]
+RESPONSE FORMAT - CRITICAL:
+1. FIRST write a friendly 1-2 sentence acknowledgment/response
+2. THEN include data tag if user provided info: [ONBOARD_DATA:field|value]
+3. THEN ask the next question
 
-Examples:
-- "bachelor's degree" → [ONBOARD_DATA:educationLevel|bachelors]
-- "computer science" → [ONBOARD_DATA:major|computer science]  
-- "8.5 GPA" → [ONBOARD_DATA:gpa|8.5]
-- "masters" → [ONBOARD_DATA:intendedDegree|masters]
-- "USA and UK" → [ONBOARD_DATA:preferredCountries|USA, UK]
-- "30000 budget" → [ONBOARD_DATA:budgetMin|30000]
-- "self funded" → [ONBOARD_DATA:fundingPlan|self_funded]
-- "not started IELTS" → [ONBOARD_DATA:ieltsStatus|not_started]
+EXAMPLE RESPONSE:
+"Great, so you have a bachelor's degree! [ONBOARD_DATA:educationLevel|bachelors] What was your major?"
 
-## SECTION COMPLETE
-When all fields for current section are filled: [SECTION_COMPLETE:${currentSection}]
+"Computer Science, excellent choice! [ONBOARD_DATA:major|Computer Science] And what's your GPA?"
 
-## YOUR TASK NOW
+NEVER respond with ONLY tags - always include conversational text!
+
 ${currentMissing.length === 0 
-  ? `Section "${currentSection}" is COMPLETE! Say a brief congratulations and output [SECTION_COMPLETE:${currentSection}]`
-  : `Ask about: ${currentMissing[0]}. Be conversational and brief.`}
-${allSectionsDone ? '\n\nALL DONE! Congratulate user and include [SECTION_COMPLETE:exams]' : ''}
-
-IMPORTANT: Always complete your sentences. Never leave a response unfinished.`;
+  ? `SECTION COMPLETE! Say "Great job completing the ${currentSection} section!" and add [SECTION_COMPLETE:${currentSection}] at the end.`
+  : `NEXT QUESTION TO ASK: ${nextQuestion}`}
+${allSectionsDone ? '\nALL SECTIONS DONE! Congratulate them warmly and add [SECTION_COMPLETE:exams]' : ''}`;
 };
 
 // AI-powered onboarding conversation - FIXED with conversation history
