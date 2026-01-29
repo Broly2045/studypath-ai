@@ -374,73 +374,82 @@ const getConversation = async (conversationId, userId) => {
 };
 
 // Get onboarding system prompt
-const getOnboardingSystemPrompt = (user, profile, currentSection, collectedData) => {
+const getOnboardingSystemPrompt = (user, profile, currentSection, collectedData, completedSections = []) => {
+  // Define required fields for each section
+  const sectionFields = {
+    academic: ['educationLevel', 'major', 'gpa'],
+    goals: ['intendedDegree', 'fieldOfStudy', 'preferredCountries'],
+    budget: ['budgetMin', 'budgetMax', 'fundingPlan'],
+    exams: ['ieltsStatus', 'greStatus', 'sopStatus'],
+  };
+
+  // Check which fields are already filled
+  const getFilledFields = (section) => {
+    return sectionFields[section].filter(field => {
+      const value = collectedData[field] || profile?.[field];
+      if (Array.isArray(value)) return value.length > 0;
+      return value !== null && value !== undefined && value !== '';
+    });
+  };
+
+  const getMissingFields = (section) => {
+    return sectionFields[section].filter(field => {
+      const value = collectedData[field] || profile?.[field];
+      if (Array.isArray(value)) return value.length === 0;
+      return value === null || value === undefined || value === '';
+    });
+  };
+
+  const currentMissing = getMissingFields(currentSection);
+  const currentFilled = getFilledFields(currentSection);
+  const allSectionsDone = currentSection === 'exams' && currentMissing.length === 0;
+
   return `You are PathFinder, a friendly AI Study Abroad Counselor conducting an onboarding interview.
 
 ## STUDENT INFO
 Name: ${user.fullName}
 Current Section: ${currentSection}
+Completed Sections: ${completedSections.length > 0 ? completedSections.join(', ') : 'None yet'}
 
-## ALREADY COLLECTED DATA (DO NOT ASK AGAIN!)
+## SECTION PROGRESS FOR "${currentSection}"
+- Fields FILLED: ${currentFilled.length > 0 ? currentFilled.join(', ') : 'None'}
+- Fields MISSING: ${currentMissing.length > 0 ? currentMissing.join(', ') : 'NONE - SECTION IS COMPLETE!'}
+
+## ALREADY COLLECTED DATA
 ${JSON.stringify(collectedData, null, 2)}
 
-## CURRENT PROFILE IN DATABASE
+## PROFILE IN DATABASE
 ${JSON.stringify(profile, null, 2)}
 
-## SECTIONS & FIELDS TO COLLECT
+## FIELDS BY SECTION
 
-### Section: academic
-Fields needed:
-- educationLevel (ask: "Are you a high school student, undergraduate, or have completed bachelor's/master's?") → Values: high_school, bachelors, masters
-- currentDegree (ask: "What's your current degree/program?") → e.g., "B.Tech", "BBA", "B.Sc"
-- major (ask: "What's your major or field?") → e.g., "Computer Science"
-- graduationYear (ask: "What year did/will you graduate?") → e.g., 2024
-- gpa (ask: "What's your GPA or percentage?") → e.g., 8.5, 3.7
-- gpaScale (ask: "Is that out of 10, 4, or 100?") → Values: 10, 4, 100
+### academic: educationLevel, major, gpa
+### goals: intendedDegree, fieldOfStudy, preferredCountries
+### budget: budgetMin, budgetMax, fundingPlan
+### exams: ieltsStatus, greStatus, sopStatus
 
-### Section: goals  
-Fields needed:
-- intendedDegree (ask: "What degree do you want to pursue abroad?") → Values: bachelors, masters, mba, phd
-- fieldOfStudy (ask: "What field do you want to study?") → e.g., "Data Science"
-- targetIntakeYear (ask: "Which year are you targeting?") → e.g., 2025
-- targetIntakeSeason (ask: "Fall, Spring, or Summer intake?") → Values: fall, spring, summer
-- preferredCountries (ask: "Which countries interest you?") → e.g., "USA, UK, Canada"
+## EXTRACTION FORMAT
+When user provides info, extract with: [ONBOARD_DATA:fieldName|value]
+Examples:
+- [ONBOARD_DATA:educationLevel|bachelors]
+- [ONBOARD_DATA:gpa|8.5]
+- [ONBOARD_DATA:preferredCountries|USA, UK, Canada]
 
-### Section: budget
-Fields needed:
-- budgetMin (ask: "What's your minimum budget per year in USD?") → e.g., 20000
-- budgetMax (ask: "What's your maximum budget per year in USD?") → e.g., 50000
-- fundingPlan (ask: "How do you plan to fund your education?") → Values: self_funded, scholarship, loan, mixed
+## SECTION COMPLETE FORMAT
+When section is done: [SECTION_COMPLETE:${currentSection}]
 
-### Section: exams
-Fields needed:
-- ieltsStatus (ask: "Have you taken or are you preparing for IELTS?") → Values: not_started, preparing, scheduled, completed
-- ieltsScore (only if completed, ask: "What was your score?") → e.g., 7.5
-- toeflStatus (ask: "What about TOEFL?") → Values: not_started, preparing, scheduled, completed
-- greStatus (ask: "Have you taken or planning GRE?") → Values: not_started, preparing, completed, not_required
-- gmatStatus (ask: "What about GMAT?") → Values: not_started, preparing, completed, not_required
-- sopStatus (ask: "Have you started your Statement of Purpose?") → Values: not_started, draft, ready
+## CRITICAL RULES
+1. Check "Fields MISSING" above - if it says "NONE", immediately mark [SECTION_COMPLETE:${currentSection}]
+2. NEVER re-ask for fields already in COLLECTED DATA or PROFILE
+3. Ask only ONE question at a time
+4. Keep responses to 2-3 sentences max
+5. Extract ALL data the user provides in one message
 
-## YOUR RULES - VERY IMPORTANT!
-
-1. **NEVER ask for information already in COLLECTED DATA or PROFILE** - Check both before asking anything!
-2. **Ask ONE question at a time** - Keep it conversational
-3. **When user answers, extract data using this format:**
-   [ONBOARD_DATA:fieldName|value]
-   Example: [ONBOARD_DATA:educationLevel|bachelors]
-   Example: [ONBOARD_DATA:gpa|8.5]
-   Example: [ONBOARD_DATA:preferredCountries|USA, UK, Canada]
-
-4. **After getting 2-3 answers in a section OR if all fields for current section are filled, mark complete:**
-   [SECTION_COMPLETE:${currentSection}]
-
-5. **Be encouraging and conversational** - Not robotic!
-6. **If user gives multiple pieces of info, extract ALL of them**
-7. **Keep responses SHORT - 2-3 sentences max**
-
-## WHAT TO DO NOW
-Look at the current section "${currentSection}" and check what fields are missing (not in collected data or profile).
-Ask for the NEXT missing field only. If section is complete, say so.`;
+## YOUR ACTION NOW
+${currentMissing.length === 0 
+  ? `IMPORTANT: Section "${currentSection}" is COMPLETE! Acknowledge briefly and output [SECTION_COMPLETE:${currentSection}]`
+  : `Ask about: ${currentMissing[0]}`}
+${allSectionsDone ? '\n\nALL SECTIONS COMPLETE! Congratulate the user and include [SECTION_COMPLETE:exams]' : ''}`;
 };
 
 // AI-powered onboarding conversation - FIXED with conversation history
@@ -456,6 +465,7 @@ const onboardingChat = async (userId, message, currentSection) => {
       onboardingConversations.set(userId, {
         messages: [],
         collectedData: {},
+        completedSections: [],
       });
     }
 
@@ -467,12 +477,13 @@ const onboardingChat = async (userId, message, currentSection) => {
       content: message,
     });
 
-    // Build the system prompt with collected data
+    // Build the system prompt with collected data and completed sections
     const systemPrompt = getOnboardingSystemPrompt(
       user, 
       user.profile, 
       currentSection,
-      userConversation.collectedData
+      userConversation.collectedData,
+      userConversation.completedSections || []
     );
 
     // Build messages array with FULL conversation history
@@ -528,6 +539,12 @@ const onboardingChat = async (userId, message, currentSection) => {
     // Check for section complete
     const sectionComplete = aiResponse.includes(`[SECTION_COMPLETE:${currentSection}]`);
 
+    // Track completed sections
+    if (sectionComplete && !userConversation.completedSections.includes(currentSection)) {
+      userConversation.completedSections.push(currentSection);
+      console.log('Section completed:', currentSection, 'All completed:', userConversation.completedSections);
+    }
+
     // Clean response
     const cleanedResponse = aiResponse
       .replace(/\[ONBOARD_DATA:[^\]]+\]/g, '')
@@ -540,6 +557,10 @@ const onboardingChat = async (userId, message, currentSection) => {
       content: cleanedResponse,
     });
 
+    // Check if all sections are complete
+    const allSections = ['academic', 'goals', 'budget', 'exams'];
+    const allComplete = allSections.every(s => userConversation.completedSections.includes(s));
+
     // If onboarding is complete (exams section done), clear the conversation memory
     if (sectionComplete && currentSection === 'exams') {
       onboardingConversations.delete(userId);
@@ -550,6 +571,7 @@ const onboardingChat = async (userId, message, currentSection) => {
       response: cleanedResponse,
       updatedFields: Object.keys(updates),
       sectionComplete,
+      allComplete,
     };
   } catch (error) {
     console.error('Onboarding chat error:', error);

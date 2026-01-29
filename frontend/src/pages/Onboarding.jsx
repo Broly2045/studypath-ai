@@ -293,12 +293,18 @@ const Onboarding = () => {
 
     try {
       const response = await aiAPI.onboardingChat(userMessage, aiSection);
-      const { response: aiResponse, sectionComplete } = response.data.data;
+      const { response: aiResponse, sectionComplete, allComplete } = response.data.data;
       
       setChatMessages((prev) => [...prev, { role: 'assistant', content: aiResponse }]);
       
       // Speak the AI response
       speakText(aiResponse);
+
+      // If all sections are complete, finish onboarding
+      if (allComplete) {
+        setTimeout(() => handleComplete(), 1500);
+        return;
+      }
 
       if (sectionComplete) {
         const sectionIndex = SECTIONS.findIndex((s) => s.id === aiSection);
